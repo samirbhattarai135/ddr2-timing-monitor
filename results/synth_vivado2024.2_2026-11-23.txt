@@ -1,0 +1,44 @@
+ddr2_bus_monitor synthesis, 2026-11-23T15:13:07
+vivado v2024.2 (64-bit)
+
+== period 3.077 ns
+Synthesis finished with 0 errors, 0 critical warnings and 50 warnings.
+18 Infos, 50 Warnings, 0 Critical Warnings and 0 Errors encountered.
+21 Infos, 1 Warnings, 0 Critical Warnings and 0 Errors encountered.
+37 Infos, 2 Warnings, 0 Critical Warnings and 0 Errors encountered.
+10 Infos, 13 Warnings, 0 Critical Warnings and 0 Errors encountered.
+# set line "ddr2_bus_monitor: period=${period_ns} ns  WNS=${wns} ns  Fmax=${fmax} MHz"
+ddr2_bus_monitor: period=3.077 ns  WNS=-10.055 ns  Fmax=76.1 MHz
+| Slice LUTs              | 4407 |     0 |          0 |     63400 |  6.95 |
+|   LUT as Logic          | 4407 |     0 |          0 |     63400 |  6.95 |
+|   LUT as Memory         |    0 |     0 |          0 |     19000 |  0.00 |
+| Slice Registers         | 2002 |     0 |          0 |    126800 |  1.58 |
+|   Register as Flip Flop | 2002 |     0 |          0 |    126800 |  1.58 |
+| F7 Muxes                |   10 |     0 |          0 |     31700 |  0.03 |
+| F8 Muxes                |    0 |     0 |          0 |     15850 |  0.00 |
+| LUT as Logic                               | 4407 |     0 |          0 |     63400 |  6.95 |
+| LUT as Memory                              |    0 |     0 |          0 |     19000 |  0.00 |
+| Slice Registers                            | 2002 |     0 |          0 |    126800 |  1.58 |
+| Block RAM Tile |    0 |     0 |          0 |       135 |  0.00 |
+| DSPs      |    0 |     0 |          0 |       240 |  0.00 |
+
+== period 2.5 ns
+Synthesis finished with 0 errors, 0 critical warnings and 50 warnings.
+18 Infos, 50 Warnings, 0 Critical Warnings and 0 Errors encountered.
+21 Infos, 1 Warnings, 0 Critical Warnings and 0 Errors encountered.
+37 Infos, 2 Warnings, 0 Critical Warnings and 0 Errors encountered.
+11 Infos, 13 Warnings, 0 Critical Warnings and 0 Errors encountered.
+# set line "ddr2_bus_monitor: period=${period_ns} ns  WNS=${wns} ns  Fmax=${fmax} MHz"
+ddr2_bus_monitor: period=2.5 ns  WNS=-10.280 ns  Fmax=78.2 MHz
+| Slice LUTs              | 4413 |     0 |          0 |     63400 |  6.96 |
+|   LUT as Logic          | 4413 |     0 |          0 |     63400 |  6.96 |
+|   LUT as Memory         |    0 |     0 |          0 |     19000 |  0.00 |
+| Slice Registers         | 2002 |     0 |          0 |    126800 |  1.58 |
+|   Register as Flip Flop | 2002 |     0 |          0 |    126800 |  1.58 |
+| F7 Muxes                |   10 |     0 |          0 |     31700 |  0.03 |
+| F8 Muxes                |    0 |     0 |          0 |     15850 |  0.00 |
+| LUT as Logic                               | 4413 |     0 |          0 |     63400 |  6.96 |
+| LUT as Memory                              |    0 |     0 |          0 |     19000 |  0.00 |
+| Slice Registers                            | 2002 |     0 |          0 |    126800 |  1.58 |
+| Block RAM Tile |    0 |     0 |          0 |       135 |  0.00 |
+| DSPs      |    0 |     0 |          0 |       240 |  0.00 |

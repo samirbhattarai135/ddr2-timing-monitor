@@ -6,7 +6,7 @@
 2. **Checks the hardware against the model.** The same command traces go through the upstream Python net and through the RTL in `nvc`. The two must agree on every command, down to the set of arcs that blocked it.
 3. **Checks the model against the datasheet.** With the net executable on both sides, short command sequences show where the model and the Micron DDR2 datasheet disagree.
 
-**Status:** simulation only. The RTL is meant to be synthesizable, and `vivado/synth.tcl` is ready, but no synthesis tool has read it yet and nothing has run on a board. This repository was built on a machine without Vivado.
+**Status:** simulated, and placed and routed in Vivado 2024.2 for the Nexys A7-100T part (out of context, no board pins). Timing does not close at the board's DDR2 clock: the estimated Fmax is about 76 MHz against 325 MHz needed. Nothing has run on a board.
 
 ## Results
 
@@ -94,6 +94,19 @@ With 2 banks the four-activate window can never bind: four ACTs need two to the 
 
 Rows 1 and 2 come from the same line, `CommandTimingConstraint(intra_rank, [ACT], [PRE], p.tRAS)`: it ties PRE on one bank to ACT on any bank, and no rule ties PREA to ACT. Row 1 waits for tRCD on bank 1 so that Table 39 (bank n row-active, command to bank m) covers it. Rows 6 and 7 come from the model listing both `tXARD` and `tXARDS` for every exit, so the larger one always wins. The datasheet has no sentence that says PREA must wait tRAS (row 2); the row rests on tRAS being the ACTIVATE-to-PRECHARGE period and on the model already applying it to PRE.
 
+### FPGA results
+
+Vivado 2024.2, `xc7a100tcsg324-1`, out-of-context place and route of `ddr2_bus_monitor` with the `ddr2_800` tables (8 banks, 54 transitions, 1,764 arcs). Run with `run_synth.ps1`; the raw output is in `results/synth_vivado2024.2_2026-11-23.txt`. Both runs finish with 0 errors and 0 critical warnings.
+
+| Target period | WNS | Estimated Fmax | Slice LUTs | Registers | Block RAM | DSP |
+|---|---|---|---|---|---|---|
+| 3.077 ns (325 MHz, the board's MIG clock) | −10.055 ns | 76.1 MHz | 4,407 (6.95%) | 2,002 (1.58%) | 0 | 0 |
+| 2.5 ns (400 MHz, DDR2-800 tCK) | −10.280 ns | 78.2 MHz | 4,413 (6.96%) | 2,002 (1.58%) | 0 | 0 |
+
+Fmax = 1000 / (period − WNS). Both runs miss their target by about 10 ns, so these are estimates from failing runs, not a closed-timing result.
+
+**The monitor cannot yet keep up with the bus.** DDR2 can issue a command on every clock, so the monitor has to judge one command per DDR2 clock: 325 MHz on this board, about 4.3 times the estimated Fmax. The likely cause is that each cycle checks every arc into the command, ORs the result, and uses it to update all state in the same cycle. Splitting that into pipeline stages, or judging the commands at the DDR2 controller's slower user-clock side (several commands per clock), are the next steps. Neither is done.
+
 ## How it works
 
 ```
@@ -121,7 +134,7 @@ upstream DRAMPyML ──► tools/net.py ──► tools/gen_vhdl.py ──► b
 - Single rank, AL = 0, burst length 8. LOAD MODE is outside the net; the decoder flags it on `unmodelled` and the monitor ignores it.
 - The decoder reads CKE, CS#, RAS#, CAS#, WE#, A10 and BA. It does not check row or column addresses.
 - Power-down exit mode (MR12) is not tracked, because the net does not distinguish fast and slow exit.
-- Simulation only, as above. Fmax and utilization are unknown until `vivado/synth.tcl` runs.
+- Out-of-context place and route only, at about 76 MHz estimated Fmax; too slow for the 325 MHz bus (see FPGA results). No board run.
 
 ## Reproduce
 
@@ -154,7 +167,8 @@ On Windows with Vivado: `powershell -ExecutionPolicy Bypass -File run_synth.ps1`
 | `tb/tb_monitor.vhd` | Differential testbench, reads `trace.txt` |
 | `tb/tb_decode.vhd` | Decoder testbench |
 | `build/<config>/net_pkg.vhd`, `arcs.tsv` | Generated tables, kept in git so Vivado needs no Python |
-| `vivado/synth.tcl` | Out-of-context place and route on the Nexys A7-100T part (not yet run) |
+| `vivado/synth.tcl` | Out-of-context place and route on the Nexys A7-100T part |
+| `results/synth_vivado2024.2_2026-11-23.txt` | Raw output of the Vivado runs |
 | `run_synth.ps1`, `tools/find_vivado.ps1` | Windows: runs `synth.tcl` at each period and collects `results_windows.txt` |
 | `run_sim.sh` | Runs everything above |
 
