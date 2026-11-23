@@ -1,0 +1,282 @@
+0	PDE -> PDN Arc	
+1	PDN -> PDX Arc	
+2	SRE -> SREF Arc	
+3	SREF -> SRX Arc	
+4	SRX -> SREF_FLAG Arc	
+5	SREF_FLAG -> REF ResetArc	
+6	PDN -> SRE InhibitorArc	
+7	PDN -> PDE InhibitorArc	
+8	PDN -> REF InhibitorArc	
+9	PDN -> PREA InhibitorArc	
+10	SREF -> REF InhibitorArc	
+11	SREF -> PREA InhibitorArc	
+12	SREF -> PDE InhibitorArc	
+13	SREF -> SRE InhibitorArc	
+14	SREF_FLAG -> SRE InhibitorArc	
+15	ACT[b0] -> ACTIVE[b0] Arc	
+16	ACTIVE[b0] -> RD[b0] Arc	
+17	RD[b0] -> ACTIVE[b0] Arc	
+18	ACTIVE[b0] -> WR[b0] Arc	
+19	WR[b0] -> ACTIVE[b0] Arc	
+20	ACTIVE[b0] -> RDA[b0] Arc	
+21	ACTIVE[b0] -> WRA[b0] Arc	
+22	ACT[b0] -> NAW_Pool Arc	
+23	NAW_Pool -> ACT[b0] timed >= 24	
+24	ACTIVE[b0] -> PREA ResetArc	
+25	ACTIVE[b0] -> PRE[b0] ResetArc	
+26	ACTIVE[b0] -> ACT[b0] InhibitorArc	
+27	ACTIVE[b0] -> REF InhibitorArc	
+28	ACTIVE[b0] -> SRE InhibitorArc	
+29	PDN -> ACT[b0] InhibitorArc	
+30	SREF -> ACT[b0] InhibitorArc	
+31	PDN -> PRE[b0] InhibitorArc	
+32	SREF -> PRE[b0] InhibitorArc	
+33	PDN -> RD[b0] InhibitorArc	
+34	PDN -> WR[b0] InhibitorArc	
+35	PDN -> RDA[b0] InhibitorArc	
+36	PDN -> WRA[b0] InhibitorArc	
+37	ACT[b1] -> ACTIVE[b1] Arc	
+38	ACTIVE[b1] -> RD[b1] Arc	
+39	RD[b1] -> ACTIVE[b1] Arc	
+40	ACTIVE[b1] -> WR[b1] Arc	
+41	WR[b1] -> ACTIVE[b1] Arc	
+42	ACTIVE[b1] -> RDA[b1] Arc	
+43	ACTIVE[b1] -> WRA[b1] Arc	
+44	ACT[b1] -> NAW_Pool Arc	
+45	NAW_Pool -> ACT[b1] timed >= 24	
+46	ACTIVE[b1] -> PREA ResetArc	
+47	ACTIVE[b1] -> PRE[b1] ResetArc	
+48	ACTIVE[b1] -> ACT[b1] InhibitorArc	
+49	ACTIVE[b1] -> REF InhibitorArc	
+50	ACTIVE[b1] -> SRE InhibitorArc	
+51	PDN -> ACT[b1] InhibitorArc	
+52	SREF -> ACT[b1] InhibitorArc	
+53	PDN -> PRE[b1] InhibitorArc	
+54	SREF -> PRE[b1] InhibitorArc	
+55	PDN -> RD[b1] InhibitorArc	
+56	PDN -> WR[b1] InhibitorArc	
+57	PDN -> RDA[b1] InhibitorArc	
+58	PDN -> WRA[b1] InhibitorArc	
+59	REF -> CMD_BUS Arc	
+60	CMD_BUS -> REF timed >= 1	
+61	PREA -> CMD_BUS Arc	
+62	CMD_BUS -> PREA timed >= 1	
+63	PDE -> CMD_BUS Arc	
+64	CMD_BUS -> PDE timed >= 1	
+65	PDX -> CMD_BUS Arc	
+66	CMD_BUS -> PDX timed >= 1	
+67	SRE -> CMD_BUS Arc	
+68	CMD_BUS -> SRE timed >= 1	
+69	SRX -> CMD_BUS Arc	
+70	CMD_BUS -> SRX timed >= 1	
+71	ACT[b0] -> CMD_BUS Arc	
+72	CMD_BUS -> ACT[b0] timed >= 1	
+73	RD[b0] -> CMD_BUS Arc	
+74	CMD_BUS -> RD[b0] timed >= 1	
+75	WR[b0] -> CMD_BUS Arc	
+76	CMD_BUS -> WR[b0] timed >= 1	
+77	PRE[b0] -> CMD_BUS Arc	
+78	CMD_BUS -> PRE[b0] timed >= 1	
+79	RDA[b0] -> CMD_BUS Arc	
+80	CMD_BUS -> RDA[b0] timed >= 1	
+81	WRA[b0] -> CMD_BUS Arc	
+82	CMD_BUS -> WRA[b0] timed >= 1	
+83	ACT[b1] -> CMD_BUS Arc	
+84	CMD_BUS -> ACT[b1] timed >= 1	
+85	RD[b1] -> CMD_BUS Arc	
+86	CMD_BUS -> RD[b1] timed >= 1	
+87	WR[b1] -> CMD_BUS Arc	
+88	CMD_BUS -> WR[b1] timed >= 1	
+89	PRE[b1] -> CMD_BUS Arc	
+90	CMD_BUS -> PRE[b1] timed >= 1	
+91	RDA[b1] -> CMD_BUS Arc	
+92	CMD_BUS -> RDA[b1] timed >= 1	
+93	WRA[b1] -> CMD_BUS Arc	
+94	CMD_BUS -> WRA[b1] timed >= 1	
+95	ACT[b0] -> PRE[b0] >= 28	tRAS
+96	ACT[b1] -> PRE[b1] >= 28	tRAS
+97	ACT[b0] -> RD[b0] >= 10	-tAL + tRCD
+98	ACT[b0] -> WR[b0] >= 10	-tAL + tRCD
+99	ACT[b0] -> RDA[b0] >= 10	-tAL + tRCD
+100	ACT[b0] -> WRA[b0] >= 10	-tAL + tRCD
+101	ACT[b1] -> RD[b1] >= 10	-tAL + tRCD
+102	ACT[b1] -> WR[b1] >= 10	-tAL + tRCD
+103	ACT[b1] -> RDA[b1] >= 10	-tAL + tRCD
+104	ACT[b1] -> WRA[b1] >= 10	-tAL + tRCD
+105	ACT[b0] -> ACT[b0] >= 38	tRC
+106	ACT[b1] -> ACT[b1] >= 38	tRC
+107	RD[b0] -> PRE[b0] >= 8	tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate
+108	RD[b1] -> PRE[b1] >= 8	tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate
+109	RD[b0] -> WR[b0] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+110	RD[b0] -> WRA[b0] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+111	RD[b1] -> WR[b1] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+112	RD[b1] -> WRA[b1] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+113	RDA[b0] -> ACT[b0] >= 18	tAL - 2*tCK + tRP + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate
+114	RDA[b1] -> ACT[b1] >= 18	tAL - 2*tCK + tRP + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate
+115	WR[b0] -> PRE[b0] >= 24	tWL + tWR + defaultBurstLength*tCK/dataRate
+116	WR[b1] -> PRE[b1] >= 24	tWL + tWR + defaultBurstLength*tCK/dataRate
+117	WR[b0] -> WR[b0] >= 4	tCCD
+118	WR[b0] -> WRA[b0] >= 4	tCCD
+119	WR[b1] -> WR[b1] >= 4	tCCD
+120	WR[b1] -> WRA[b1] >= 4	tCCD
+121	WR[b0] -> RD[b0] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+122	WR[b0] -> RDA[b0] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+123	WR[b1] -> RD[b1] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+124	WR[b1] -> RDA[b1] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+125	WRA[b0] -> ACT[b0] >= 34	tRP + tWL + tWR + defaultBurstLength*tCK/dataRate
+126	WRA[b1] -> ACT[b1] >= 34	tRP + tWL + tWR + defaultBurstLength*tCK/dataRate
+127	PRE[b0] -> ACT[b0] >= 10	tRP
+128	PRE[b1] -> ACT[b1] >= 10	tRP
+129	ACT[b0] -> PRE[b0] >= 28	tRAS
+130	ACT[b0] -> PRE[b1] >= 28	tRAS
+131	ACT[b1] -> PRE[b0] >= 28	tRAS
+132	ACT[b1] -> PRE[b1] >= 28	tRAS
+133	ACT[b0] -> ACT[b0] >= 5	tRRD
+134	ACT[b0] -> ACT[b1] >= 5	tRRD
+135	ACT[b1] -> ACT[b0] >= 5	tRRD
+136	ACT[b1] -> ACT[b1] >= 5	tRRD
+137	ACT[b0] -> PDE >= 1	tCK
+138	ACT[b1] -> PDE >= 1	tCK
+139	RD[b0] -> PREA >= 8	tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate
+140	RDA[b0] -> PREA >= 8	tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate
+141	RD[b1] -> PREA >= 8	tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate
+142	RDA[b1] -> PREA >= 8	tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate
+143	RD[b0] -> PDE >= 15	tCK + tRL + defaultBurstLength*tCK/dataRate
+144	RDA[b0] -> PDE >= 15	tCK + tRL + defaultBurstLength*tCK/dataRate
+145	RD[b1] -> PDE >= 15	tCK + tRL + defaultBurstLength*tCK/dataRate
+146	RDA[b1] -> PDE >= 15	tCK + tRL + defaultBurstLength*tCK/dataRate
+147	RD[b0] -> RD[b0] >= 4	tCCD
+148	RD[b0] -> RDA[b0] >= 4	tCCD
+149	RD[b0] -> RD[b1] >= 4	tCCD
+150	RD[b0] -> RDA[b1] >= 4	tCCD
+151	RDA[b0] -> RD[b0] >= 4	tCCD
+152	RDA[b0] -> RDA[b0] >= 4	tCCD
+153	RDA[b0] -> RD[b1] >= 4	tCCD
+154	RDA[b0] -> RDA[b1] >= 4	tCCD
+155	RD[b1] -> RD[b0] >= 4	tCCD
+156	RD[b1] -> RDA[b0] >= 4	tCCD
+157	RD[b1] -> RD[b1] >= 4	tCCD
+158	RD[b1] -> RDA[b1] >= 4	tCCD
+159	RDA[b1] -> RD[b0] >= 4	tCCD
+160	RDA[b1] -> RDA[b0] >= 4	tCCD
+161	RDA[b1] -> RD[b1] >= 4	tCCD
+162	RDA[b1] -> RDA[b1] >= 4	tCCD
+163	RD[b0] -> WR[b0] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+164	RD[b0] -> WRA[b0] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+165	RD[b0] -> WR[b1] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+166	RD[b0] -> WRA[b1] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+167	RDA[b0] -> WR[b0] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+168	RDA[b0] -> WRA[b0] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+169	RDA[b0] -> WR[b1] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+170	RDA[b0] -> WRA[b1] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+171	RD[b1] -> WR[b0] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+172	RD[b1] -> WRA[b0] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+173	RD[b1] -> WR[b1] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+174	RD[b1] -> WRA[b1] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+175	RDA[b1] -> WR[b0] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+176	RDA[b1] -> WRA[b0] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+177	RDA[b1] -> WR[b1] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+178	RDA[b1] -> WRA[b1] >= 7	tCK + tRL - tWL + defaultBurstLength*tCK/dataRate
+179	RDA[b0] -> REF >= 16	tAL + tRP + tRTP
+180	RDA[b1] -> REF >= 16	tAL + tRP + tRTP
+181	WR[b0] -> WR[b0] >= 4	tCCD
+182	WR[b0] -> WRA[b0] >= 4	tCCD
+183	WR[b0] -> WR[b1] >= 4	tCCD
+184	WR[b0] -> WRA[b1] >= 4	tCCD
+185	WR[b1] -> WR[b0] >= 4	tCCD
+186	WR[b1] -> WRA[b0] >= 4	tCCD
+187	WR[b1] -> WR[b1] >= 4	tCCD
+188	WR[b1] -> WRA[b1] >= 4	tCCD
+189	WR[b0] -> RD[b0] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+190	WR[b0] -> RDA[b0] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+191	WR[b0] -> RD[b1] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+192	WR[b0] -> RDA[b1] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+193	WRA[b0] -> RD[b0] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+194	WRA[b0] -> RDA[b0] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+195	WRA[b0] -> RD[b1] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+196	WRA[b0] -> RDA[b1] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+197	WR[b1] -> RD[b0] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+198	WR[b1] -> RDA[b0] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+199	WR[b1] -> RD[b1] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+200	WR[b1] -> RDA[b1] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+201	WRA[b1] -> RD[b0] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+202	WRA[b1] -> RDA[b0] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+203	WRA[b1] -> RD[b1] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+204	WRA[b1] -> RDA[b1] >= 18	-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate
+205	WR[b0] -> PDE >= 24	tWL + tWR + defaultBurstLength*tCK/dataRate
+206	WR[b1] -> PDE >= 24	tWL + tWR + defaultBurstLength*tCK/dataRate
+207	WRA[b0] -> PDE >= 25	tCK + tWL + tWR + defaultBurstLength*tCK/dataRate
+208	WRA[b1] -> PDE >= 25	tCK + tWL + tWR + defaultBurstLength*tCK/dataRate
+209	WRA[b0] -> REF >= 34	tRP + tWL + tWR + defaultBurstLength*tCK/dataRate
+210	WRA[b1] -> REF >= 34	tRP + tWL + tWR + defaultBurstLength*tCK/dataRate
+211	WR[b0] -> PREA >= 24	tWL + tWR + defaultBurstLength*tCK/dataRate
+212	WRA[b0] -> PREA >= 24	tWL + tWR + defaultBurstLength*tCK/dataRate
+213	WR[b1] -> PREA >= 24	tWL + tWR + defaultBurstLength*tCK/dataRate
+214	WRA[b1] -> PREA >= 24	tWL + tWR + defaultBurstLength*tCK/dataRate
+215	WRA[b0] -> REF >= 34	tRP + tWL + tWR + defaultBurstLength*tCK/dataRate
+216	WRA[b1] -> REF >= 34	tRP + tWL + tWR + defaultBurstLength*tCK/dataRate
+217	WRA[b0] -> SRE >= 34	Max(tCK + tWL + tWR + defaultBurstLength*tCK/dataRate, tRP + tWL + tWR + defaultBurstLength*tCK/dataRate)
+218	WRA[b1] -> SRE >= 34	Max(tCK + tWL + tWR + defaultBurstLength*tCK/dataRate, tRP + tWL + tWR + defaultBurstLength*tCK/dataRate)
+219	PRE[b0] -> SRE >= 10	tRP
+220	PRE[b1] -> SRE >= 10	tRP
+221	PRE[b0] -> REF >= 10	tRP
+222	PRE[b1] -> REF >= 10	tRP
+223	PREA -> REF >= 10	tRP
+224	PREA -> SRE >= 10	tRP
+225	PREA -> ACT[b0] >= 10	tRP
+226	PREA -> ACT[b1] >= 10	tRP
+227	PREA -> PDE >= 1	tCK
+228	PRE[b0] -> PDE >= 1	tCK
+229	PRE[b1] -> PDE >= 1	tCK
+230	PDE -> PDX >= 3	tPD
+231	PDE -> PDX >= 3	tPD
+232	PDX -> PDE >= 1	tCK
+233	PDX -> PDE >= 1	tCK
+234	PDX -> REF >= 6	tXP
+235	PDX -> SRE >= 6	tXP
+236	PDX -> ACT[b0] >= 6	tXP
+237	PDX -> ACT[b1] >= 6	tXP
+238	PDX -> PREA >= 6	tXP
+239	PDX -> ACT[b0] >= 6	tXP
+240	PDX -> WR[b0] >= 6	tXP
+241	PDX -> PRE[b0] >= 6	tXP
+242	PDX -> WRA[b0] >= 6	tXP
+243	PDX -> ACT[b1] >= 6	tXP
+244	PDX -> WR[b1] >= 6	tXP
+245	PDX -> PRE[b1] >= 6	tXP
+246	PDX -> WRA[b1] >= 6	tXP
+247	PDX -> PREA >= 6	tXP
+248	PDX -> ACT[b0] >= 6	tXP
+249	PDX -> WR[b0] >= 6	tXP
+250	PDX -> PRE[b0] >= 6	tXP
+251	PDX -> WRA[b0] >= 6	tXP
+252	PDX -> ACT[b1] >= 6	tXP
+253	PDX -> WR[b1] >= 6	tXP
+254	PDX -> PRE[b1] >= 6	tXP
+255	PDX -> WRA[b1] >= 6	tXP
+256	PDX -> RD[b0] >= 2	tXARD
+257	PDX -> RDA[b0] >= 2	tXARD
+258	PDX -> RD[b1] >= 2	tXARD
+259	PDX -> RDA[b1] >= 2	tXARD
+260	PDX -> RD[b0] >= 6	-tAL + 6*tCK
+261	PDX -> RDA[b0] >= 6	-tAL + 6*tCK
+262	PDX -> RD[b1] >= 6	-tAL + 6*tCK
+263	PDX -> RDA[b1] >= 6	-tAL + 6*tCK
+264	REF -> REF >= 88	tRFC
+265	REF -> SRE >= 88	tRFC
+266	REF -> ACT[b0] >= 88	tRFC
+267	REF -> ACT[b1] >= 88	tRFC
+268	REF -> PDE >= 1	tCK
+269	SRX -> REF >= 2	tXSNR
+270	SRX -> PDE >= 2	tXSNR
+271	SRX -> SRE >= 2	tXSNR
+272	SRX -> ACT[b0] >= 2	tXSNR
+273	SRX -> WR[b0] >= 2	tXSNR
+274	SRX -> WRA[b0] >= 2	tXSNR
+275	SRX -> ACT[b1] >= 2	tXSNR
+276	SRX -> WR[b1] >= 2	tXSNR
+277	SRX -> WRA[b1] >= 2	tXSNR
+278	SRX -> RD[b0] >= 200	tXSRD
+279	SRX -> RDA[b0] >= 200	tXSRD
+280	SRX -> RD[b1] >= 200	tXSRD
+281	SRX -> RDA[b1] >= 200	tXSRD

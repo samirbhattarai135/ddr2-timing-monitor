@@ -1,0 +1,11 @@
+work/
+build/*/trace.txt
+build/*/coverage.json
+build/*.log
+.venv/
+__pycache__/
+vivado/reports/
+vivado/*.log
+vivado/*.jou
+vivado/.Xil/
+.DS_Store
