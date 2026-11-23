@@ -129,7 +129,7 @@ begin
           for i in ARCS'range loop
             arc := ARCS(i);
             if arc.dst = cmd_t and (arc.kind = ARC_IN or arc.kind = ARC_TIMED) then
-              for w in 1 to arc.weight loop
+              for w in 1 to ARCS(i).weight loop
                 q(arc.src)(0 to TOK_MAX - 2) := q(arc.src)(1 to TOK_MAX - 1);
                 c(arc.src) := c(arc.src) - 1;
               end loop;
@@ -144,7 +144,7 @@ begin
           for i in ARCS'range loop
             arc := ARCS(i);
             if arc.src = cmd_t and arc.kind = ARC_OUT then
-              for w in 1 to arc.weight loop
+              for w in 1 to ARCS(i).weight loop
                 assert c(arc.dst) < PLACE_CAP(arc.dst)
                   report "place " & integer'image(arc.dst) & " exceeds its capacity"
                   severity failure;

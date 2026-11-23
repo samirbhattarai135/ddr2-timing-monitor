@@ -6,7 +6,7 @@
 2. **Checks the hardware against the model.** The same command traces go through the upstream Python net and through the RTL in `nvc`. The two must agree on every command, down to the set of arcs that blocked it.
 3. **Checks the model against the datasheet.** With the net executable on both sides, short command sequences show where the model and the Micron DDR2 datasheet disagree.
 
-**Status:** simulation only. The RTL is written to be synthesizable, and `vivado/synth.tcl` is ready, but it has not been through Vivado or onto a board. This repository was built on a machine without Vivado.
+**Status:** simulation only. The RTL is meant to be synthesizable, and `vivado/synth.tcl` is ready, but no synthesis tool has read it yet and nothing has run on a board. This repository was built on a machine without Vivado.
 
 ## Results
 
@@ -24,7 +24,7 @@ Run `./run_sim.sh` (about 8 minutes on an 8-core laptop, almost all of it in the
 
 "Disagreements" compares the legal/illegal verdict and the exact set of blocking arcs. The testbench stops on the first difference. To check that it would, three deliberate faults were each caught on the first trace: a corrupted expected verdict, an off-by-one in the timing comparison (`<=` for `<`), and a monitor that skips reset arcs.
 
-The pin decoder (`rtl/ddr2_cmd_decode.vhd`) is checked separately against Table 37 of the datasheet: all 12 commands on all 8 banks, NOP and DESELECT silent, LOAD MODE and a command on a CKE edge flagged (60 checks).
+The pin decoder (`rtl/ddr2_cmd_decode.vhd`) is checked separately against Table 37 of the datasheet: the 6 bank commands on each of the 8 banks, the 6 rank commands, NOP and DESELECT silent, LOAD MODE and a command on a CKE edge flagged (60 checks).
 
 ### Timing-rule coverage
 
@@ -32,16 +32,16 @@ A rule class is one timing bound between two commands, grouped across banks (for
 
 | config | classes | blocked at bound-1 and issued at bound | blocked only | issued only | neither |
 |---|---|---|---|---|---|
-| upstream | 99 | 64 | 5 | 20 | 10 |
-| upstream_8bank | 99 | 58 | 11 | 18 | 12 |
-| ddr2_800 | 99 | 61 | 9 | 19 | 10 |
+| upstream | 99 | 69 | 0 | 15 | 15 |
+| upstream_8bank | 99 | 69 | 0 | 16 | 14 |
+| ddr2_800 | 99 | 70 | 0 | 15 | 14 |
 
-Every class never hit can never bind, except one:
+Each class never hit (15, 14 and 14) is one that cannot bind in that net, for these reasons:
 - RDA/WRA -> RD, RDA, WR, WRA on the same bank: auto-precharge closes the bank, so the next access waits for ACT plus tRCD, which is longer.
-- ACT -> ACT on the same bank at tRRD: tRC is longer. PDX -> RD at tXARD: the parallel tXARDS arc is longer.
-- SRX -> SRE, WR, WRA at tXSNR: each needs a REF or an ACT first, and those already wait tXSNR.
+- ACT -> ACT on the same bank at tRRD: tRC is longer. PDX -> RD/RDA at tXARD: the parallel tXARDS arc is longer.
+- SRX -> SRE, WR, WRA at tXSNR: SRE needs a REF first and then tRFC; WR needs an ACT first and then tRCD. Both are longer.
+- The command bus before PDX and REF: its bound is one cycle, and every legal command before PDX or REF already needs two cycles or more.
 - The four-activate pool in `upstream`: with 2 banks it cannot bind (see below).
-- The exception is `CMD_BUS -> SRE` in `upstream_8bank`. Its bound is one cycle, so it never blocks anything; no SRE happened to follow another command with zero slack.
 
 `tools/coverage.py` lists each class by name.
 
@@ -49,7 +49,7 @@ Every class never hit can never bind, except one:
 
 Source for every datasheet value: Micron *1Gb: x4, x8, x16 DDR2 SDRAM*, 1GbDDR2.pdf Rev. Y 02/14. The Nexys A7 carries the MT47H64M16HR-25 part (Digilent reference manual, section 3.1), and Digilent's MIG settings name the -25E grade.
 
-**The timing values are DDR3-1600's.** `drampyml/timing_params/ddr2.py` matches DRAMSys's `MICRON_1Gb_DDR3-1600_8bit_G.json` on every parameter that file defines, and differs from DRAMSys's own `MICRON_1Gb_DDR2-800_16bit_H.json` on 14 of them. The DDR2-only parameters (tXSNR, tXSRD, tXARD) look like DDR2 cycle counts. `nbrOfBanks` is 2; a 1 Gb DDR2 part has 8.
+**The timing values are DDR3-1600's.** `drampyml/timing_params/ddr2.py` and DRAMSys's `MICRON_1Gb_DDR3-1600_8bit_G.json` share 16 parameters: 15 by name, plus tPD, which this table compares with DRAMSys `CKE`. All 16 are equal, and 14 of them differ from DRAMSys's own `MICRON_1Gb_DDR2-800_16bit_H.json`. The self-refresh and power-down exit values (tXSNR 2, tXSRD 200, tXARD 2) do not come from the DDR3 file, whose `XS` is 96 and `XSDLL` 512; they look like DDR2 cycle counts. `nbrOfBanks` is 2; a 1 Gb DDR2 part has 8.
 
 | Parameter | DRAMPyML DDR2 | DRAMSys DDR3-1600 | DRAMSys DDR2-800 | Micron -25E (this repo) |
 |---|---|---|---|---|
@@ -82,7 +82,7 @@ With 2 banks the four-activate window can never bind: four ACTs need two to the 
 
 | # | Case | Config | Sequence (cmd@cycle) | Model | Datasheet | Why |
 |---|---|---|---|---|---|---|
-| 1 | PRE to bank 0 is blocked by an ACT to bank 1 | ddr2_800 | ACT0@0, ACT1@20, PRE0@21 | rejects (ACT[b1] -> PRE[b0] >= 16) | legal | tRAS is the per-bank ACTIVATE-to-PRECHARGE period (Table 12, p. 39). Bank 0 has been open 21 cycles, more than tRAS = 16. |
+| 1 | PRE to bank 0 is blocked by an ACT to bank 1 | ddr2_800 | ACT0@0, ACT1@20, PRE0@26 | rejects (ACT[b1] -> PRE[b0] >= 16) | legal | Table 39, p. 76: with bank 1 row-active (tRCD met), PRECHARGE to another bank is allowed. Bank 0 has been open 26 cycles, more than tRAS = 16. |
 | 2 | PREA one cycle after an ACT | ddr2_800 | ACT0@0, PREA@1 | accepts | illegal | Bank 0 has been open 1 cycle; tRAS = 16 (Table 12, p. 39). The model enforces tRAS for PRE on that bank but not for PREA. |
 | 3 | ACT 5 cycles after PREA | ddr2_800 | ACT0@0, PREA@30, ACT1@35 | accepts | illegal | Note 36, p. 45: tRPA applies after PRECHARGE ALL; for 1 Gb parts tRPA = 15 ns = 6 cycles at -25E (Table 12, p. 39). The model uses tRP = 5. |
 | 4 | Second READ 2 cycles after the first, burst length 8 | ddr2_800 | ACT0@0, RD0@5, RD0@7 | accepts | illegal | p. 95: the next READ is issued BL/2 = 4 cycles after the first. The model uses tCCD alone (2); upstream's tCCD = 4 hides this. |
@@ -92,7 +92,7 @@ With 2 banks the four-activate window can never bind: four ACTs need two to the 
 | 8 | ACT 2 cycles after self-refresh exit (upstream timing) | upstream | SRE@0, SRX@10, ACT0@12 | accepts | illegal | tXSNR = tRFC(min) + 10 ns (Table 12, p. 41), 55 cycles at -25E; upstream sets tXSNR = 2. |
 | 9 | WRITE 6 cycles after READ (upstream timing) | upstream | ACT0@0, RD0@10, WR0@16 | rejects (RD[b0] -> WR[b0] >= 7; RD[b0] -> WR[b0] >= 7) | legal | WL = RL - 1 (p. 86), so tRL = 10 implies tWL = 9 and the model's own READ-to-WRITE bound tRL + BL/2 + tCK - tWL is 6. Upstream sets tWL = 8, which makes it 7. |
 
-Rows 1 and 2 come from the same line, `CommandTimingConstraint(intra_rank, [ACT], [PRE], p.tRAS)`: it ties PRE on one bank to ACT on any bank, and no rule ties PREA to ACT. Rows 6 and 7 come from the model listing both `tXARD` and `tXARDS` for every exit, so the larger one always wins. The datasheet has no sentence that says PREA must wait tRAS (row 2); the row rests on tRAS being the ACTIVATE-to-PRECHARGE period and on the model already applying it to PRE.
+Rows 1 and 2 come from the same line, `CommandTimingConstraint(intra_rank, [ACT], [PRE], p.tRAS)`: it ties PRE on one bank to ACT on any bank, and no rule ties PREA to ACT. Row 1 waits for tRCD on bank 1 so that Table 39 (bank n row-active, command to bank m) covers it. Rows 6 and 7 come from the model listing both `tXARD` and `tXARDS` for every exit, so the larger one always wins. The datasheet has no sentence that says PREA must wait tRAS (row 2); the row rests on tRAS being the ACTIVATE-to-PRECHARGE period and on the model already applying it to PRE.
 
 ## How it works
 

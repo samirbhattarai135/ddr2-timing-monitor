@@ -56,9 +56,9 @@ def _earliest(net, t, after):
     return found
 
 
-def _binding_arcs(net, t):
-    """Timing arcs into t that are satisfied with zero slack right now."""
-    g, now, out = net.graph, net.current_time, []
+def _binding_arcs(net, t, now):
+    """Timing arcs into t that would be satisfied with zero slack at cycle `now`."""
+    g, out = net.graph, []
     for e in g.in_edge_indices(t):
         arc = g.get_edge_data_by_index(e)
         if isinstance(arc, CustomArc) and now - arc.timestamp == int(arc.time_constraint):
@@ -94,7 +94,7 @@ def _one_trace(args):
 
     def emit(time, t):
         nonlocal last
-        binding = _binding_arcs(net, t) if time >= net.current_time else []
+        binding = _binding_arcs(net, t, time)
         v = step(net, Command(time, t))
         _check_safe(net, caps)
         arcs = sorted(edge_ids[e] for e in v.blocking_arcs)

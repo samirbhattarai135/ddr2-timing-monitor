@@ -24,9 +24,9 @@ class Case:
 
 CASES = [
     Case("PRE to bank 0 is blocked by an ACT to bank 1",
-         "ddr2_800", ((0, "ACT", 0), (20, "ACT", 1), (21, "PRE", 0)), True,
-         "tRAS is the per-bank ACTIVATE-to-PRECHARGE period (Table 12, p. 39). "
-         "Bank 0 has been open 21 cycles, more than tRAS = 16."),
+         "ddr2_800", ((0, "ACT", 0), (20, "ACT", 1), (26, "PRE", 0)), True,
+         "Table 39, p. 76: with bank 1 row-active (tRCD met), PRECHARGE to another "
+         "bank is allowed. Bank 0 has been open 26 cycles, more than tRAS = 16."),
     Case("PREA one cycle after an ACT",
          "ddr2_800", ((0, "ACT", 0), (1, "PREA", None)), False,
          "Bank 0 has been open 1 cycle; tRAS = 16 (Table 12, p. 39). The model "
@@ -83,8 +83,9 @@ def memspec_table():
         same += d3 == upstream[k]
         differ_from_ddr2 += k in DRAMSYS_DDR3_1600 and d2 != "-" and d2 != upstream[k]
         print(f"| {k} | {upstream[k]} | {d3} | {d2} | {sheet[k]} |")
-    print(f"\nAll {same} parameters the DDR3-1600 file defines equal DRAMPyML's; "
-          f"{differ_from_ddr2} of them differ from DRAMSys's own DDR2-800 file.")
+    print(f"\nAll {same} parameters DRAMPyML shares with the DDR3-1600 file are equal "
+          f"(tPD compared with DRAMSys CKE); {differ_from_ddr2} of them differ from "
+          f"DRAMSys's own DDR2-800 file.")
 
 
 def judge(case):
