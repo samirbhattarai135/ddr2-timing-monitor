@@ -105,7 +105,15 @@ Vivado 2024.2, `xc7a100tcsg324-1`, out-of-context place and route of `ddr2_bus_m
 
 Fmax = 1000 / (period − WNS). Both runs miss their target by about 10 ns, so these are estimates from failing runs, not a closed-timing result.
 
-**The monitor cannot yet keep up with the bus.** DDR2 can issue a command on every clock, so the monitor has to judge one command per DDR2 clock: 325 MHz on this board, about 4.3 times the estimated Fmax. The likely cause is that each cycle checks every arc into the command, ORs the result, and uses it to update all state in the same cycle. Splitting that into pipeline stages, or judging the commands at the DDR2 controller's slower user-clock side (several commands per clock), are the next steps. Neither is done.
+**The monitor cannot yet keep up with the bus.** DDR2 can issue a command on every clock, so the monitor has to judge one command per DDR2 clock: 325 MHz on this board, about 4.3 times the estimated Fmax. The worst path (`vivado/reports/3.077/timing.rpt`, 12.6 ns, 15 logic levels, 76% of it routing) runs through three steps in one cycle:
+
+| Step | From → to | Time |
+|---|---|---|
+| Decode the pins | `decode/cke_prev_reg` → `cmd_t` (fan-out 149) | about 4.0 ns |
+| Check every arc into the command and OR the result | `cmd_t` → the legal signal (three CARRY4 stages, fan-out 80) | about 6.3 ns |
+| Fire: update the state | legal → `monitor/t_age_reg[37][0]` set pin | about 2.3 ns plus setup |
+
+2,048 of 2,330 endpoints fail, so this is the shape of the whole design, not one bad path. The loop that limits speed is check → fire → next check: the next command's verdict depends on this command's state update. Registering the decoder output removes the first step at no cost in correctness (every command moves one cycle later). Getting the other two under 3.077 ns needs the check reformulated: for example one "cycles until legal" counter per transition, updated from a constant row per fired command, so the verdict is one table look-up; the per-arc blocking report would move to a pipeline stage that does not feed back. Neither change is done.
 
 ## How it works
 

@@ -10,3 +10,4 @@ vivado/*.jou
 vivado/.Xil/
 .DS_Store
 results_windows.txt
+vivado/clockInfo.txt
