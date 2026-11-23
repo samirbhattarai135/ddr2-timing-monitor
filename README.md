@@ -22,6 +22,8 @@ Run `./run_sim.sh` (about 8 minutes on an 8-core laptop, almost all of it in the
 | `upstream_8bank` (same timing, 8 banks) | 8 | 30,035 | 21,783 | 8,252 | 194,750 | 0 |
 | `ddr2_800` (Micron -25E datasheet timing) | 8 | 30,041 | 22,177 | 7,864 | 133,566 | 0 |
 
+![Legal and illegal commands per config](docs/img/results.png)
+
 "Disagreements" compares the legal/illegal verdict and the exact set of blocking arcs. The testbench stops on the first difference. To check that it would, three deliberate faults were each caught on the first trace: a corrupted expected verdict, an off-by-one in the timing comparison (`<=` for `<`), and a monitor that skips reset arcs.
 
 The pin decoder (`rtl/ddr2_cmd_decode.vhd`) is checked separately against Table 37 of the datasheet: the 6 bank commands on each of the 8 banks, the 6 rank commands, NOP and DESELECT silent, LOAD MODE and a command on a CKE edge flagged (60 checks).
@@ -92,7 +94,11 @@ With 2 banks the four-activate window can never bind: four ACTs need two to the 
 | 8 | ACT 2 cycles after self-refresh exit (upstream timing) | upstream | SRE@0, SRX@10, ACT0@12 | accepts | illegal | tXSNR = tRFC(min) + 10 ns (Table 12, p. 41), 55 cycles at -25E; upstream sets tXSNR = 2. |
 | 9 | WRITE 6 cycles after READ (upstream timing) | upstream | ACT0@0, RD0@10, WR0@16 | rejects (RD[b0] -> WR[b0] >= 7; RD[b0] -> WR[b0] >= 7) | legal | WL = RL - 1 (p. 86), so tRL = 10 implies tWL = 9 and the model's own READ-to-WRITE bound tRL + BL/2 + tCK - tWL is 6. Upstream sets tWL = 8, which makes it 7. |
 
-Rows 1 and 2 come from the same line, `CommandTimingConstraint(intra_rank, [ACT], [PRE], p.tRAS)`: it ties PRE on one bank to ACT on any bank, and no rule ties PREA to ACT. Row 1 waits for tRCD on bank 1 so that Table 39 (bank n row-active, command to bank m) covers it. Rows 6 and 7 come from the model listing both `tXARD` and `tXARDS` for every exit, so the larger one always wins. The datasheet has no sentence that says PREA must wait tRAS (row 2); the row rests on tRAS being the ACTIVATE-to-PRECHARGE period and on the model already applying it to PRE.
+Rows 1 and 2 come from the same line, `CommandTimingConstraint(intra_rank, [ACT], [PRE], p.tRAS)`: it ties PRE on one bank to ACT on any bank, and no rule ties PREA to ACT. Row 1 waits for tRCD on bank 1 so that Table 39 (bank n row-active, command to bank m) covers it.
+
+![Audit row 1: ACT to bank 0 at cycle 0, ACT to bank 1 at cycle 20, PRE to bank 0 at cycle 26 is rejected](docs/img/timeline_audit1.png)
+
+*Audit row 1 replayed in the architecture page's monitor: the PRE to bank 0 at cycle 26 (red) is rejected by the ACT to bank 1 at cycle 20, although bank 0 has been open 26 cycles.* Rows 6 and 7 come from the model listing both `tXARD` and `tXARDS` for every exit, so the larger one always wins. The datasheet has no sentence that says PREA must wait tRAS (row 2); the row rests on tRAS being the ACTIVATE-to-PRECHARGE period and on the model already applying it to PRE.
 
 ### FPGA results
 
@@ -117,17 +123,11 @@ Fmax = 1000 / (period − WNS). Both runs miss their target by about 10 ns, so t
 
 ## How it works
 
-```
-upstream DRAMPyML ──► tools/net.py ──► tools/gen_vhdl.py ──► build/<config>/net_pkg.vhd ─┐
-  (pinned submodule)   build net,       one table row per                                 │
-                       fold timings     arc                                               ▼
-                           │                                     rtl/ddr2_cmd_decode.vhd ──► rtl/petri_monitor.vhd
-                           │                                       pins ─► transition id      runs the tables
-                           ▼                                                                  │
-                    tools/oracle.py ──► tools/tracegen.py ──► trace.txt ──► tb/tb_monitor.vhd ◄┘
-                    upstream verdict    random walks +        command +     compares every
-                    + blocking arcs     probes + noise        expected      verdict
-```
+![Toolchain: the upstream net feeds both the VHDL generator and the Python oracle; the testbench compares their verdicts](docs/img/toolchain.png)
+
+![Pipeline: a command in cycle 1 gets its verdict in cycle 2](docs/img/pipeline.png)
+
+The diagrams come from [`docs/architecture.html`](docs/architecture.html), a self-contained page with a live monitor, a pin decoder and the audit table. GitHub shows it as source; download it and open it in a browser.
 
 - **One clock is one tCK.** Petri-net time and clock cycles are the same thing; the net's timing values are already in tCK.
 - **Ages, not timestamps.** Each transition keeps a counter of cycles since it last fired, saturating above the largest bound. A timing arc A -> B blocks B while `age(A) < bound`. A counter that never fired sits at the top, which matches upstream's initial timestamp of -2^32.
@@ -179,6 +179,7 @@ On Windows with Vivado: `powershell -ExecutionPolicy Bypass -File run_synth.ps1`
 | `results/synth_vivado2024.2_2026-11-23.txt` | Raw output of the Vivado runs |
 | `run_synth.ps1`, `tools/find_vivado.ps1` | Windows: runs `synth.tcl` at each period and collects `results_windows.txt` |
 | `run_sim.sh` | Runs everything above |
+| `docs/architecture.html` | Self-contained architecture page (open locally); `docs/img/` holds the diagrams exported from it |
 
 ## Related work
 

@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-D5U/U0xGxLo0BxVW/KvZipk0fGk6H5L8uzM+2RTP/v4='; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DDR2 Timing Monitor</title>
+<style>
+/* Layout: datasheet. One narrow reading column; diagrams break out wider. Scope-trace palette: ink navy, signal green, amber for illegal commands. */
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --ink: #14201f;
+  --muted: #54625f;
+  --line: #c7d1ce;
+  --accent: #0b6e5c;
+  --accent-soft: #d9eee8;
+  --data: #1f5f9e;
+  --data-soft: #dce9f6;
+  --fault: #a85a00;
+  --fault-soft: #f8e7cf;
+  --bad: #b3261e;
+  --bad-soft: #f6dcda;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1514; --surface: #162120; --ink: #e2ebe9; --muted: #92a39f; --line: #2c3d3a;
+    --accent: #4fcfb2; --accent-soft: #123a33; --data: #7ab4ee; --data-soft: #16304a;
+    --fault: #f0b45f; --fault-soft: #3b2a10; --bad: #f08b84; --bad-soft: #3d1c1a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1514; --surface: #162120; --ink: #e2ebe9; --muted: #92a39f; --line: #2c3d3a;
+  --accent: #4fcfb2; --accent-soft: #123a33; --data: #7ab4ee; --data-soft: #16304a;
+  --fault: #f0b45f; --fault-soft: #3b2a10; --bad: #f08b84; --bad-soft: #3d1c1a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.6 var(--f-body); margin: 0; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 40px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 56px; }
+.prose { max-width: 66ch; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.7rem; font-weight: 600; }
+h3 { font-size: 1.15rem; font-weight: 600; }
+p { margin: 0; }
+section { display: grid; gap: 18px; min-width: 0; }
+.eyebrow { font: 600 0.75rem/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 1.15rem; color: var(--muted); max-width: 62ch; }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip { border: 1px solid var(--line); background: var(--surface); padding: 10px 14px; border-radius: 4px; display: grid; gap: 2px; min-width: 150px; }
+.chip b { font: 600 1.35rem/1.1 var(--f-mono); font-variant-numeric: tabular-nums; }
+.chip span { font-size: 0.82rem; color: var(--muted); }
+.figure { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; overflow-x: auto; min-width: 0; }
+.figure svg { display: block; width: 100%; height: auto; min-width: 640px; }
+.figure.small svg { min-width: 0; }
+.cap { font-size: 0.85rem; color: var(--muted); }
+svg text { font-family: var(--f-mono); fill: var(--ink); }
+svg .t-muted { fill: var(--muted); }
+svg .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+svg .ctl { fill: var(--accent-soft); stroke: var(--accent); }
+svg .dp { fill: var(--data-soft); stroke: var(--data); }
+svg .mem { fill: var(--surface); stroke: var(--ink); }
+svg .flt { fill: var(--fault-soft); stroke: var(--fault); }
+svg .wire { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+svg .wire.on { stroke: var(--accent); stroke-width: 2.5; }
+svg [role="button"] { cursor: pointer; }
+svg [role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.82rem; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border: 1.5px solid; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select, input { font: 500 0.85rem/1 var(--f-mono); padding: 9px 12px; border-radius: 4px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="number"] { width: 5.5em; }
+label { font-size: 0.82rem; color: var(--muted); display: grid; gap: 4px; }
+.readout { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; min-height: 3.2em; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.cols > * { min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: grid; gap: 8px; align-content: start; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 0.75rem/1.2 var(--f-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+td.n { font-family: var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; }
+tr.hit td { background: var(--accent-soft); }
+tr.diff td.d { color: var(--bad); font-weight: 600; }
+.tablewrap { overflow-x: auto; }
+.tablewrap table { min-width: 560px; }
+.verdict { font: 600 1.05rem/1.3 var(--f-display); }
+.verdict.ok { color: var(--accent); } .verdict.no { color: var(--bad); } .verdict.warn { color: var(--fault); }
+.status { display: inline-block; font: 600 0.72rem/1 var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 8px; border-radius: 3px; background: var(--fault-soft); color: var(--fault); }
+.status.ok { background: var(--accent-soft); color: var(--accent); }
+.rule { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 14px 16px; font-weight: 500; }
+.pins { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 10px; }
+footer { color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--line); padding-top: 16px; display: grid; gap: 6px; }
+@media (prefers-reduced-motion: no-preference) { svg .wire, svg rect { transition: stroke 0.2s, fill 0.2s; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header style="display:grid;gap:18px">
+  <div class="eyebrow">VHDL · DDR2 · ddr2-timing-monitor</div>
+  <h1>DDR2 Timing Monitor</h1>
+  <p class="lede">DRAMPyML writes the JEDEC DDR2 rules as a timed Petri net. This project turns that net into VHDL tables. A small generic monitor runs the tables on a DDR2 command bus. It flags each command that the net rejects. No DDR2 rule is written by hand.</p>
+  <div class="chips">
+    <div class="chip"><b>90,119</b><span>commands, RTL and net agree</span></div>
+    <div class="chip"><b>0</b><span>mismatches in 3 configs</span></div>
+    <div class="chip"><b>1,764</b><span>arcs in the 8-bank net</span></div>
+    <div class="chip"><b>9</b><span>sequences where model and datasheet disagree</span></div>
+  </div>
+  <p class="cap">Vivado 2024.2 places and routes the monitor for the Nexys A7-100T part, with 0 errors. The estimated Fmax is 76 MHz. The DDR2 clock on the board is 325 MHz, so the monitor is too slow for the bus at this time. Nothing has run on a board. Section 9 gives the numbers.</p>
+</header>
+
+<section>
+  <div class="eyebrow">1 · Toolchain</div>
+  <h2>One net, two ways to run it</h2>
+  <p class="prose">The upstream net is the source of truth. A generator writes the net as VHDL tables. The monitor reads the tables. A Python oracle runs the same net on random traces. The testbench makes the monitor run each trace and compares every verdict. Select a box for its job.</p>
+  <div class="figure">
+    <svg id="flow" viewBox="0 0 960 440" role="group" aria-label="Toolchain block diagram"></svg>
+  </div>
+  <div class="readout" id="flowOut" aria-live="polite"></div>
+  <div class="legend"><span><i style="border-color:var(--data);background:var(--data-soft)"></i>upstream and Python</span><span><i style="border-color:var(--accent);background:var(--accent-soft)"></i>RTL (VHDL)</span><span><i style="border-color:var(--ink)"></i>generated file</span><span><i style="border-color:var(--fault);background:var(--fault-soft)"></i>testbench</span></div>
+</section>
+
+<section>
+  <div class="eyebrow">2 · The net</div>
+  <h2>Places, transitions and five arc kinds</h2>
+  <p class="prose">A <b>place</b> holds tokens. A <b>transition</b> is one DDR2 command. Each bank has an <span class="mono">ACTIVE</span> place. The rank has <span class="mono">PDN</span>, <span class="mono">SREF</span> and <span class="mono">SREF_FLAG</span>. A pool of four tokens, <span class="mono">NAW_Pool</span>, models tFAW. <span class="mono">CMD_BUS</span> allows one command in each cycle. The upstream net has 12 commands: ACT, RD, WR, RDA, WRA and PRE for each bank, and PREA, REF, PDE, PDX, SRE and SRX for the rank.</p>
+  <div class="btns" id="kindBtns" role="group" aria-label="Arc kinds"></div>
+  <div class="figure"><svg id="netfig" viewBox="0 0 880 340" role="img" aria-label="Net of one bank: places, commands and arcs"></svg></div>
+  <div class="readout" id="kindOut" aria-live="polite"></div>
+  <p class="cap">The figure shows bank 0 of the net in <span class="mono">build/ddr2_800/net_pkg.vhd</span>. Arc kinds and counts come from <span class="mono">drampyml/components/petri_net.py</span> and the generated tables.</p>
+  <div class="tablewrap"><table id="arcCounts"></table></div>
+</section>
+
+<section>
+  <div class="eyebrow">3 · The monitor, live</div>
+  <h2>Issue commands to two banks</h2>
+  <p class="prose">Choose a config. Set how many cycles to wait. Then press a command. The page runs the monitor rules and shows the verdict, the blocking arcs and the earliest legal cycle. The table has the real bounds from the generated <span class="mono">net_pkg.vhd</span>. It has 2 banks, 5 commands and 88 of the arcs. Power-down and self-refresh arcs are left out.</p>
+  <div class="card">
+    <div class="btns" id="cfgBtns" role="group" aria-label="Config"></div>
+    <div class="btns">
+      <label>Wait (cycles, 1 to 250)<input type="number" id="wait" min="1" max="250" value="1" aria-label="Cycles to wait before the next command"></label>
+      <span id="cmdBtns" class="btns" role="group" aria-label="Commands"></span>
+    </div>
+    <div class="btns"><button type="button" id="undoBtn">Undo last</button><button type="button" id="clearBtn">Clear</button><span class="cap">Presets from the audit (section 8):</span><span id="presetBtns" class="btns" role="group" aria-label="Presets"></span></div>
+    <div class="readout" id="monOut" aria-live="polite"></div>
+    <div class="figure small"><svg id="tl" viewBox="0 0 880 170" role="img" aria-label="Timeline of the issued commands"></svg></div>
+    <div class="tablewrap"><table id="monTable"></table></div>
+  </div>
+  <div class="legend"><span><i style="border-color:var(--accent);background:var(--accent-soft)"></i>legal: the net fires it</span><span><i style="border-color:var(--bad);background:var(--bad-soft)"></i>illegal: flagged and ignored</span></div>
+  <p class="cap">This is a JS port of the rules in <span class="mono">rtl/petri_monitor.vhd</span> (<span class="mono">simulate</span> below follows its three steps). The oracle in <span class="mono">tools/oracle.py</span> makes the same verdicts. The first command is at cycle 0.</p>
+</section>
+
+<section>
+  <div class="eyebrow">4 · Firing order and pipeline</div>
+  <h2>Check, age, fire. The verdict comes one cycle later</h2>
+  <p class="prose">Each cycle at most one command arrives as a transition id. The monitor does three steps in one clock edge. A legal command changes the state. An illegal command only counts as a violation.</p>
+  <div class="btns" id="stepBtns" role="group" aria-label="Monitor steps"></div>
+  <div class="cols">
+    <div class="card"><h3 id="stepTitle"></h3><p id="stepText" aria-live="polite"></p></div>
+    <div class="card">
+      <h3>Pipeline</h3>
+      <div class="btns" id="pipeBtns" role="group" aria-label="Second command"></div>
+      <p class="cap">The second command (B) is legal or illegal. The first (A) is legal.</p>
+    </div>
+  </div>
+  <div class="figure"><svg id="wave" viewBox="0 0 880 330" role="img" aria-label="Waveform: command in, verdict one cycle later"></svg></div>
+  <p class="cap">Signal names are from <span class="mono">rtl/petri_monitor.vhd</span> and <span class="mono">rtl/ddr2_bus_monitor.vhd</span>. <span class="mono">first_arc</span> is the lowest-numbered blocking arc. Arc names are in <span class="mono">build/&lt;config&gt;/arcs.tsv</span>.</p>
+</section>
+
+<section>
+  <div class="eyebrow">5 · Pin decoder</div>
+  <h2>From CKE, CS#, RAS#, CAS#, WE#, A10 and BA to a transition id</h2>
+  <p class="prose">The decoder follows Table 37 of the Micron datasheet. It samples the pins on each clock. It keeps the last value of CKE. It also keeps a flag that says whether the part is in self refresh. This flag tells SRX from PDX. Set the pins, or select a command to set them.</p>
+  <div class="card">
+    <div class="pins" id="pinSel"></div>
+    <div class="btns" id="encBtns" role="group" aria-label="Set the pins for a command"></div>
+    <div class="readout" id="decOut" aria-live="polite"></div>
+  </div>
+  <div class="tablewrap"><table id="t37"></table></div>
+  <p class="cap">The page uses the same rules as the process in <span class="mono">rtl/ddr2_cmd_decode.vhd</span>. Transition ids are those of <span class="mono">T_ID</span> in <span class="mono">build/ddr2_800/net_pkg.vhd</span>. <span class="mono">tb/tb_decode.vhd</span> makes 60 checks on the real decoder: the 6 bank commands on each of the 8 banks, the 6 rank commands, NOP and DESELECT silent, LOAD MODE and a command on a CKE edge flagged.</p>
+</section>
+
+<section>
+  <div class="eyebrow">6 · Results</div>
+  <h2>The RTL agrees with the net on every command</h2>
+  <p class="prose">Each config ran 200 random traces of 150 commands. A trace is a random walk on the net. Some steps are probes one cycle early, which must be illegal. Some steps are random noise. The testbench compares the legal or illegal verdict and the exact set of blocking arcs. It stops at the first difference. Select a bar for the numbers.</p>
+  <div class="figure"><svg id="res" viewBox="0 0 880 250" role="img" aria-label="Legal and illegal commands for each config"></svg></div>
+  <div class="readout" id="resOut" aria-live="polite"></div>
+  <div class="figure"><svg id="cyc" viewBox="0 0 880 190" role="img" aria-label="Simulated cycles for each config"></svg></div>
+  <div class="legend"><span><i style="border-color:var(--accent);background:var(--accent-soft)"></i>legal</span><span><i style="border-color:var(--fault);background:var(--fault-soft)"></i>illegal</span><span><i style="border-color:var(--data);background:var(--data-soft)"></i>cycles</span></div>
+  <div class="cols">
+    <div class="card">
+      <h3>Three faults put in on purpose</h3>
+      <p>Each fault was caught on the first trace.</p>
+      <table>
+        <tr><th>#</th><th>Fault</th></tr>
+        <tr><td class="n">1</td><td>A corrupted expected verdict</td></tr>
+        <tr><td class="n">2</td><td>An off-by-one in the timing test (<span class="mono">&lt;=</span> for <span class="mono">&lt;</span>)</td></tr>
+        <tr><td class="n">3</td><td>A monitor that skips reset arcs</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Reproduced</h3>
+      <p>A clean full rerun of <span class="mono">run_sim.sh</span> gave every number again, exactly. The decoder testbench made 60 checks.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">7 · Where the numbers in the net come from</div>
+  <h2>The shared timing values are DDR3-1600 values</h2>
+  <p class="prose">DRAMPyML's DDR2 timing file and the DRAMSys <span class="mono">MICRON_1Gb_DDR3-1600_8bit_G.json</span> memspec share 16 parameters. 15 match by name. The 16th is tPD, which the table compares with DRAMSys <span class="mono">CKE</span>. All 16 are equal. 14 of them differ from the DRAMSys DDR2-800 file. The self-refresh and power-down exit values (tXSNR 2, tXSRD 200, tXARD 2) do not come from the DDR3 file. Its <span class="mono">XS</span> is 96 and its <span class="mono">XSDLL</span> is 512. They look like DDR2 cycle counts. The net also has 2 banks, but a 1 Gb DDR2 part has 8. The project adds a config with datasheet timing, <span class="mono">ddr2_800</span>. Select a row to compare the columns.</p>
+  <div class="tablewrap"><table id="memspec"></table></div>
+  <div class="readout" id="memOut" aria-live="polite"></div>
+  <p class="cap">All values are in tCK cycles. DRAMSys values are from commit b43b4da of the memspec files. Source: <span class="mono">tools/audit.py</span> and <span class="mono">tools/net.py</span>. tRC is 22 in this repo (55 ns, Table 12) and 23 in DRAMSys (57.5 ns, the IDD table). With 2 banks, the four-activate window cannot bind: four ACT commands need two to the same bank, and tRC (38) is longer than tFAW (24).</p>
+</section>
+
+<section>
+  <div class="eyebrow">8 · Audit</div>
+  <h2>Nine places where the model and the datasheet disagree</h2>
+  <p class="prose">Each row is a short command sequence. The net gives its verdict. The Micron 1Gb DDR2 datasheet (Rev. Y) gives the other. <span class="mono">tools/audit.py</span> fails if one row stops disagreeing, so an upstream fix shows at once. The <span class="mono">ddr2_800</span> rows use datasheet timing, so they test the structure of the net, not its numbers. Load a row in the monitor of section 3 to see the model verdict.</p>
+  <div class="tablewrap"><table id="audit"></table></div>
+  <div class="rule">Rows 1 and 2 come from the same line, <span class="mono">CommandTimingConstraint(intra_rank, [ACT], [PRE], p.tRAS)</span>. It ties PRE on one bank to ACT on any bank. No rule ties PREA to ACT. Row 1 waits for tRCD on bank 1, so that Table 39 (bank n row-active, command to bank m) covers it. Rows 6 and 7 come from the model that lists both tXARD and tXARDS for every exit, so the larger bound always wins.</div>
+  <p class="cap">The Model column is the result of <span class="mono">tools/audit.py</span>, with the blocking arcs where it lists them. Row 2 rests on tRAS being the ACTIVATE-to-PRECHARGE period, which the model already applies to PRE. The datasheet has no sentence that says PREA must wait tRAS.</p>
+</section>
+
+<section>
+  <div class="eyebrow">9 · Status and limits</div>
+  <h2>What the monitor does not do</h2>
+  <div class="cols">
+    <div class="card"><span class="status">below target</span><h3>Fmax</h3><p>Estimated 76.1 MHz at a 3.077 ns target (WNS −10.055 ns) and 78.2 MHz at 2.5 ns (WNS −10.280 ns). The board DDR2 clock is 325 MHz.</p><p class="cap">Vivado 2024.2, out of context. Fmax = 1000 / (period − WNS). Both runs fail their target, so the values are estimates. Source: <span class="mono">results/synth_vivado2024.2_2026-11-23.txt</span>.</p></div>
+    <div class="card"><span class="status ok">measured</span><h3>Area</h3><p>4,407 LUTs (6.95%) and 2,002 flip-flops (1.58%) at 3.077 ns. The monitor uses no block RAM and no DSP.</p><p class="cap">Part <span class="mono">xc7a100tcsg324-1</span>. The 2.5 ns run uses 4,413 LUTs.</p></div>
+    <div class="card"><span class="status">pending</span><h3>Board</h3><p>Nothing has run on a board. The monitor must first run at one command for each DDR2 clock. The target part for the target board is the Nexys A7-100T (<span class="mono">xc7a100tcsg324-1</span>).</p></div>
+  </div>
+  <div class="tablewrap">
+  <table>
+    <tr><th>Area</th><th>In this project</th></tr>
+    <tr><td>Rules</td><td>The monitor checks what the net checks. The net has only lower bounds. A missing refresh (tREFI) or a row open past tRAS(max) is not flagged.</td></tr>
+    <tr><td>Scope</td><td>Single rank, AL = 0, burst length 8.</td></tr>
+    <tr><td>LOAD MODE</td><td>Outside the net. The decoder sets <span class="mono">unmodelled</span>. The monitor ignores it.</td></tr>
+    <tr><td>Addresses</td><td>The decoder reads CKE, CS#, RAS#, CAS#, WE#, A10 and BA. It does not check row or column addresses.</td></tr>
+    <tr><td>Pin pattern H H L</td><td>The decoder gives no command and no flag for it (the burst terminate pattern).</td></tr>
+    <tr><td>Power-down exit</td><td>The mode (MR12) is not tracked, because the net does not tell fast and slow exit apart.</td></tr>
+    <tr><td>Datasheet</td><td>The monitor copies the 9 disagreements of section 8. It checks the net, not the datasheet.</td></tr>
+    <tr><td>Illegal command</td><td>The monitor flags it and ignores it. The net cannot fire a disabled transition, so both sides stay in step.</td></tr>
+  </table>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">10 · Files</div>
+  <div class="tablewrap">
+  <table>
+    <tr><th>File</th><th>Job</th></tr>
+    <tr><td class="mono">third_party/DRAMBench</td><td>Upstream DRAMPyML, a git submodule at commit <span class="mono">4ab21b5</span></td></tr>
+    <tr><td class="mono">tools/net.py</td><td>Builds the upstream net for a config and folds its timings. Holds the three memspecs.</td></tr>
+    <tr><td class="mono">tools/gen_vhdl.py</td><td>Writes <span class="mono">net_pkg.vhd</span> and <span class="mono">arcs.tsv</span></td></tr>
+    <tr><td class="mono">tools/oracle.py</td><td>Replays a trace through the upstream net. Gives the verdict and the blocking arcs.</td></tr>
+    <tr><td class="mono">tools/tracegen.py</td><td>Random-walk traces with expected verdicts, and rule coverage</td></tr>
+    <tr><td class="mono">tools/coverage.py</td><td>Coverage summary for each config</td></tr>
+    <tr><td class="mono">tools/audit.py</td><td>Memspec table and the datasheet disagreements</td></tr>
+    <tr><td class="mono">rtl/petri_monitor.vhd</td><td>Generic executor for the generated tables</td></tr>
+    <tr><td class="mono">rtl/ddr2_cmd_decode.vhd</td><td>DDR2 pins to transition id</td></tr>
+    <tr><td class="mono">rtl/ddr2_bus_monitor.vhd</td><td>Decoder, monitor and first-blocking-arc encoder</td></tr>
+    <tr><td class="mono">tb/tb_monitor.vhd</td><td>Differential testbench. Reads <span class="mono">trace.txt</span>.</td></tr>
+    <tr><td class="mono">tb/tb_decode.vhd</td><td>Decoder testbench</td></tr>
+    <tr><td class="mono">build/&lt;config&gt;/net_pkg.vhd, arcs.tsv</td><td>Generated tables</td></tr>
+    <tr><td class="mono">vivado/synth.tcl</td><td>Out-of-context place and route (not run)</td></tr>
+    <tr><td class="mono">run_sim.sh</td><td>Runs the generator, the traces and both testbenches in nvc</td></tr>
+  </table>
+  </div>
+</section>
+
+<footer>
+  <div>Written in ASD-STE100 Simplified Technical English.</div>
+  <div>Sources: Ernst et al., Autoformalizing Memory Specifications with Agents (arXiv 2605.00058). DRAMBench repository (DRAMPyML, pinned at 4ab21b5). Micron 1Gb x4, x8, x16 DDR2 SDRAM datasheet, Rev. Y. DRAMSys memspec files.</div>
+</footer>
+</div>
+
+<script type="application/json" id="net-data">{"upstream":{"hdr":{"N_T":18,"N_P":7,"N_ARC":282,"N_BANKS":2,"AGE_MAX":201,"TOK_MAX":4},"agemax":201,"places":{"ACTIVE[b0]":[0,1],"NAW_Pool":[4,4],"ACTIVE[b1]":[0,1],"CMD_BUS":[1,1]},"arcs":[[15,"O","ACT0","ACTIVE[b0]",1,0,""],[16,"I","ACTIVE[b0]","RD0",1,0,""],[17,"O","RD0","ACTIVE[b0]",1,0,""],[18,"I","ACTIVE[b0]","WR0",1,0,""],[19,"O","WR0","ACTIVE[b0]",1,0,""],[22,"O","ACT0","NAW_Pool",1,0,""],[23,"T","NAW_Pool","ACT0",1,24,""],[24,"R","ACTIVE[b0]","PREA",1,0,""],[25,"R","ACTIVE[b0]","PRE0",1,0,""],[26,"H","ACTIVE[b0]","ACT0",1,0,""],[37,"O","ACT1","ACTIVE[b1]",1,0,""],[38,"I","ACTIVE[b1]","RD1",1,0,""],[39,"O","RD1","ACTIVE[b1]",1,0,""],[40,"I","ACTIVE[b1]","WR1",1,0,""],[41,"O","WR1","ACTIVE[b1]",1,0,""],[44,"O","ACT1","NAW_Pool",1,0,""],[45,"T","NAW_Pool","ACT1",1,24,""],[46,"R","ACTIVE[b1]","PREA",1,0,""],[47,"R","ACTIVE[b1]","PRE1",1,0,""],[48,"H","ACTIVE[b1]","ACT1",1,0,""],[61,"O","PREA","CMD_BUS",1,0,""],[62,"T","CMD_BUS","PREA",1,1,""],[71,"O","ACT0","CMD_BUS",1,0,""],[72,"T","CMD_BUS","ACT0",1,1,""],[73,"O","RD0","CMD_BUS",1,0,""],[74,"T","CMD_BUS","RD0",1,1,""],[75,"O","WR0","CMD_BUS",1,0,""],[76,"T","CMD_BUS","WR0",1,1,""],[77,"O","PRE0","CMD_BUS",1,0,""],[78,"T","CMD_BUS","PRE0",1,1,""],[83,"O","ACT1","CMD_BUS",1,0,""],[84,"T","CMD_BUS","ACT1",1,1,""],[85,"O","RD1","CMD_BUS",1,0,""],[86,"T","CMD_BUS","RD1",1,1,""],[87,"O","WR1","CMD_BUS",1,0,""],[88,"T","CMD_BUS","WR1",1,1,""],[89,"O","PRE1","CMD_BUS",1,0,""],[90,"T","CMD_BUS","PRE1",1,1,""],[95,"C","ACT0","PRE0",1,28,"tRAS"],[96,"C","ACT1","PRE1",1,28,"tRAS"],[97,"C","ACT0","RD0",1,10,"-tAL + tRCD"],[98,"C","ACT0","WR0",1,10,"-tAL + tRCD"],[101,"C","ACT1","RD1",1,10,"-tAL + tRCD"],[102,"C","ACT1","WR1",1,10,"-tAL + tRCD"],[105,"C","ACT0","ACT0",1,38,"tRC"],[106,"C","ACT1","ACT1",1,38,"tRC"],[107,"C","RD0","PRE0",1,8,"tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate"],[108,"C","RD1","PRE1",1,8,"tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate"],[109,"C","RD0","WR0",1,7,"tCK + tRL - tWL + defaultBurstLength*tCK/dataRate"],[111,"C","RD1","WR1",1,7,"tCK + tRL - tWL + defaultBurstLength*tCK/dataRate"],[115,"C","WR0","PRE0",1,24,"tWL + tWR + defaultBurstLength*tCK/dataRate"],[116,"C","WR1","PRE1",1,24,"tWL + tWR + defaultBurstLength*tCK/dataRate"],[117,"C","WR0","WR0",1,4,"tCCD"],[119,"C","WR1","WR1",1,4,"tCCD"],[121,"C","WR0","RD0",1,18,"-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate"],[123,"C","WR1","RD1",1,18,"-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate"],[127,"C","PRE0","ACT0",1,10,"tRP"],[128,"C","PRE1","ACT1",1,10,"tRP"],[129,"C","ACT0","PRE0",1,28,"tRAS"],[130,"C","ACT0","PRE1",1,28,"tRAS"],[131,"C","ACT1","PRE0",1,28,"tRAS"],[132,"C","ACT1","PRE1",1,28,"tRAS"],[133,"C","ACT0","ACT0",1,5,"tRRD"],[134,"C","ACT0","ACT1",1,5,"tRRD"],[135,"C","ACT1","ACT0",1,5,"tRRD"],[136,"C","ACT1","ACT1",1,5,"tRRD"],[139,"C","RD0","PREA",1,8,"tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate"],[141,"C","RD1","PREA",1,8,"tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate"],[147,"C","RD0","RD0",1,4,"tCCD"],[149,"C","RD0","RD1",1,4,"tCCD"],[155,"C","RD1","RD0",1,4,"tCCD"],[157,"C","RD1","RD1",1,4,"tCCD"],[163,"C","RD0","WR0",1,7,"tCK + tRL - tWL + defaultBurstLength*tCK/dataRate"],[165,"C","RD0","WR1",1,7,"tCK + tRL - tWL + defaultBurstLength*tCK/dataRate"],[171,"C","RD1","WR0",1,7,"tCK + tRL - tWL + defaultBurstLength*tCK/dataRate"],[173,"C","RD1","WR1",1,7,"tCK + tRL - tWL + defaultBurstLength*tCK/dataRate"],[181,"C","WR0","WR0",1,4,"tCCD"],[183,"C","WR0","WR1",1,4,"tCCD"],[185,"C","WR1","WR0",1,4,"tCCD"],[187,"C","WR1","WR1",1,4,"tCCD"],[189,"C","WR0","RD0",1,18,"-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate"],[191,"C","WR0","RD1",1,18,"-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate"],[197,"C","WR1","RD0",1,18,"-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate"],[199,"C","WR1","RD1",1,18,"-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate"],[211,"C","WR0","PREA",1,24,"tWL + tWR + defaultBurstLength*tCK/dataRate"],[213,"C","WR1","PREA",1,24,"tWL + tWR + defaultBurstLength*tCK/dataRate"],[225,"C","PREA","ACT0",1,10,"tRP"],[226,"C","PREA","ACT1",1,10,"tRP"]],"nplaces":7},"ddr2_800":{"hdr":{"N_T":54,"N_P":13,"N_ARC":1764,"N_BANKS":8,"AGE_MAX":201,"TOK_MAX":4},"agemax":201,"places":{"ACTIVE[b0]":[0,1],"NAW_Pool":[4,4],"ACTIVE[b1]":[0,1],"CMD_BUS":[1,1]},"arcs":[[15,"O","ACT0","ACTIVE[b0]",1,0,""],[16,"I","ACTIVE[b0]","RD0",1,0,""],[17,"O","RD0","ACTIVE[b0]",1,0,""],[18,"I","ACTIVE[b0]","WR0",1,0,""],[19,"O","WR0","ACTIVE[b0]",1,0,""],[22,"O","ACT0","NAW_Pool",1,0,""],[23,"T","NAW_Pool","ACT0",1,18,""],[24,"R","ACTIVE[b0]","PREA",1,0,""],[25,"R","ACTIVE[b0]","PRE0",1,0,""],[26,"H","ACTIVE[b0]","ACT0",1,0,""],[37,"O","ACT1","ACTIVE[b1]",1,0,""],[38,"I","ACTIVE[b1]","RD1",1,0,""],[39,"O","RD1","ACTIVE[b1]",1,0,""],[40,"I","ACTIVE[b1]","WR1",1,0,""],[41,"O","WR1","ACTIVE[b1]",1,0,""],[44,"O","ACT1","NAW_Pool",1,0,""],[45,"T","NAW_Pool","ACT1",1,18,""],[46,"R","ACTIVE[b1]","PREA",1,0,""],[47,"R","ACTIVE[b1]","PRE1",1,0,""],[48,"H","ACTIVE[b1]","ACT1",1,0,""],[193,"O","PREA","CMD_BUS",1,0,""],[194,"T","CMD_BUS","PREA",1,1,""],[203,"O","ACT0","CMD_BUS",1,0,""],[204,"T","CMD_BUS","ACT0",1,1,""],[205,"O","RD0","CMD_BUS",1,0,""],[206,"T","CMD_BUS","RD0",1,1,""],[207,"O","WR0","CMD_BUS",1,0,""],[208,"T","CMD_BUS","WR0",1,1,""],[209,"O","PRE0","CMD_BUS",1,0,""],[210,"T","CMD_BUS","PRE0",1,1,""],[215,"O","ACT1","CMD_BUS",1,0,""],[216,"T","CMD_BUS","ACT1",1,1,""],[217,"O","RD1","CMD_BUS",1,0,""],[218,"T","CMD_BUS","RD1",1,1,""],[219,"O","WR1","CMD_BUS",1,0,""],[220,"T","CMD_BUS","WR1",1,1,""],[221,"O","PRE1","CMD_BUS",1,0,""],[222,"T","CMD_BUS","PRE1",1,1,""],[299,"C","ACT0","PRE0",1,16,"tRAS"],[300,"C","ACT1","PRE1",1,16,"tRAS"],[307,"C","ACT0","RD0",1,5,"-tAL + tRCD"],[308,"C","ACT0","WR0",1,5,"-tAL + tRCD"],[311,"C","ACT1","RD1",1,5,"-tAL + tRCD"],[312,"C","ACT1","WR1",1,5,"-tAL + tRCD"],[339,"C","ACT0","ACT0",1,22,"tRC"],[340,"C","ACT1","ACT1",1,22,"tRC"],[347,"C","RD0","PRE0",1,5,"tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate"],[348,"C","RD1","PRE1",1,5,"tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate"],[355,"C","RD0","WR0",1,6,"tCK + tRL - tWL + defaultBurstLength*tCK/dataRate"],[357,"C","RD1","WR1",1,6,"tCK + tRL - tWL + defaultBurstLength*tCK/dataRate"],[379,"C","WR0","PRE0",1,14,"tWL + tWR + defaultBurstLength*tCK/dataRate"],[380,"C","WR1","PRE1",1,14,"tWL + tWR + defaultBurstLength*tCK/dataRate"],[387,"C","WR0","WR0",1,2,"tCCD"],[389,"C","WR1","WR1",1,2,"tCCD"],[403,"C","WR0","RD0",1,11,"-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate"],[405,"C","WR1","RD1",1,11,"-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate"],[427,"C","PRE0","ACT0",1,5,"tRP"],[428,"C","PRE1","ACT1",1,5,"tRP"],[435,"C","ACT0","PRE0",1,16,"tRAS"],[436,"C","ACT0","PRE1",1,16,"tRAS"],[443,"C","ACT1","PRE0",1,16,"tRAS"],[444,"C","ACT1","PRE1",1,16,"tRAS"],[499,"C","ACT0","ACT0",1,4,"tRRD"],[500,"C","ACT0","ACT1",1,4,"tRRD"],[507,"C","ACT1","ACT0",1,4,"tRRD"],[508,"C","ACT1","ACT1",1,4,"tRRD"],[571,"C","RD0","PREA",1,5,"tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate"],[573,"C","RD1","PREA",1,5,"tAL - 2*tCK + Max(tRTP, 2*tCK) + defaultBurstLength*tCK/dataRate"],[603,"C","RD0","RD0",1,2,"tCCD"],[605,"C","RD0","RD1",1,2,"tCCD"],[635,"C","RD1","RD0",1,2,"tCCD"],[637,"C","RD1","RD1",1,2,"tCCD"],[859,"C","RD0","WR0",1,6,"tCK + tRL - tWL + defaultBurstLength*tCK/dataRate"],[861,"C","RD0","WR1",1,6,"tCK + tRL - tWL + defaultBurstLength*tCK/dataRate"],[891,"C","RD1","WR0",1,6,"tCK + tRL - tWL + defaultBurstLength*tCK/dataRate"],[893,"C","RD1","WR1",1,6,"tCK + tRL - tWL + defaultBurstLength*tCK/dataRate"],[1123,"C","WR0","WR0",1,2,"tCCD"],[1125,"C","WR0","WR1",1,2,"tCCD"],[1139,"C","WR1","WR0",1,2,"tCCD"],[1141,"C","WR1","WR1",1,2,"tCCD"],[1251,"C","WR0","RD0",1,11,"-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate"],[1253,"C","WR0","RD1",1,11,"-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate"],[1283,"C","WR1","RD0",1,11,"-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate"],[1285,"C","WR1","RD1",1,11,"-tAL + tWL + tWTR + defaultBurstLength*tCK/dataRate"],[1531,"C","WR0","PREA",1,14,"tWL + tWR + defaultBurstLength*tCK/dataRate"],[1533,"C","WR1","PREA",1,14,"tWL + tWR + defaultBurstLength*tCK/dataRate"],[1581,"C","PREA","ACT0",1,5,"tRP"],[1582,"C","PREA","ACT1",1,5,"tRP"]],"nplaces":13}}</script>
+<script>
+(() => {
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, parent, text) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; };
+  const hh = (tag, attrs, parent, text) => { const e = document.createElement(tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; };
+  const $ = id => document.getElementById(id);
+  const fmt = n => Number(n).toLocaleString("en-US");
+  const press = (e, fn) => { e.addEventListener("click", fn); e.addEventListener("keydown", ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); fn(); } }); };
+  const arrowDefs = svg => { el("defs", {}, svg).innerHTML = '<marker id="ah-' + svg.id + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>'; return "url(#ah-" + svg.id + ")"; };
+
+  const NET = JSON.parse($("net-data").textContent);
+
+  /* CORE-BEGIN: port of rtl/petri_monitor.vhd (net rows from build/<config>/net_pkg.vhd) */
+  const TOK_MAX = 4;
+  const ageUp = (a, max, d) => Math.min(max, a + d);
+  function freshState(cfg) {
+    const net = NET[cfg], S = { tAge: {}, pl: {} };
+    for (const n in net.places) S.pl[n] = { count: net.places[n][0], tok: new Array(TOK_MAX).fill(net.agemax) };
+    return S;
+  }
+  const tAgeOf = (S, net, t) => (t in S.tAge ? S.tAge[t] : net.agemax);
+  function tick(S, net, d) {
+    for (const t in S.tAge) S.tAge[t] = ageUp(S.tAge[t], net.agemax, d);
+    for (const p in S.pl) S.pl[p].tok = S.pl[p].tok.map(a => ageUp(a, net.agemax, d));
+  }
+  /* Step 1: which arcs into this transition block it? */
+  function blockedArcs(S, net, cmd) {
+    const out = [];
+    for (const [id, k, src, dst, w, b, ex] of net.arcs) {
+      if (dst !== cmd) continue;
+      if (k === "I") { const c = S.pl[src].count; if (c < w) out.push({ id, k, src, dst, bound: w, have: c, ex }); }
+      else if (k === "H") { const c = S.pl[src].count; if (c >= w) out.push({ id, k, src, dst, bound: w, have: c, ex }); }
+      else if (k === "T") {
+        let ready = 0; const P = S.pl[src];
+        for (let i = 0; i < TOK_MAX; i++) if (i < P.count && P.tok[i] >= b) ready++;
+        if (ready < w) out.push({ id, k, src, dst, bound: b, w, have: ready, ex });
+      } else if (k === "C") { const a = tAgeOf(S, net, src); if (a < b) out.push({ id, k, src, dst, bound: b, have: a, ex }); }
+    }
+    return out;
+  }
+  /* Step 3: consume (oldest first), reset, produce, then the command age is 1. */
+  function fire(S, net, cmd) {
+    for (const [, k, src, dst, w] of net.arcs) {
+      if (dst === cmd && (k === "I" || k === "T")) for (let i = 0; i < w; i++) { const P = S.pl[src]; const last = P.tok[TOK_MAX - 1]; P.tok.shift(); P.tok.push(last); P.count--; }
+    }
+    for (const [, k, src, dst] of net.arcs) if (dst === cmd && k === "R") S.pl[src].count = 0;
+    for (const [, k, src, dst, w] of net.arcs) {
+      if (src === cmd && k === "O") for (let i = 0; i < w; i++) { const P = S.pl[dst]; P.tok[P.count] = 1; P.count++; }
+    }
+    S.tAge[cmd] = 1;
+  }
+  /* cmds: [{cycle, cmd}] with strictly rising cycles. Time passes also after an illegal command. */
+  function simulate(cfg, cmds) {
+    const net = NET[cfg], S = freshState(cfg), rows = [];
+    let prev = null;
+    for (const c of cmds) {
+      if (prev !== null && c.cycle - prev > 1) tick(S, net, c.cycle - prev - 1);
+      const blocked = blockedArcs(S, net, c.cmd);
+      let earliest = null;
+      if (blocked.length) {
+        const probe = JSON.parse(JSON.stringify(S));
+        for (let k = 1; k <= 300 && earliest === null; k++) { tick(probe, net, 1); if (!blockedArcs(probe, net, c.cmd).length) earliest = c.cycle + k; }
+      }
+      tick(S, net, 1);
+      if (!blocked.length) fire(S, net, c.cmd);
+      rows.push({ cycle: c.cycle, cmd: c.cmd, legal: blocked.length === 0, blocked, earliest });
+      prev = c.cycle;
+    }
+    return { rows, S };
+  }
+  /* CORE-END */
+
+  /* CORE2-BEGIN: port of the process in rtl/ddr2_cmd_decode.vhd (Micron Table 37) */
+  const BANK_CMDS = { ACT: 6, RD: 7, WR: 8, PRE: 9, RDA: 10, WRA: 11 };
+  const RANK_CMDS = { REF: 0, PREA: 1, PDE: 2, PDX: 3, SRE: 4, SRX: 5 };
+  const tid = (c, bank) => (c in RANK_CMDS ? RANK_CMDS[c] : BANK_CMDS[c] + 6 * bank);
+  /* p: {ckePrev, cke, cs, ras, cas, we, a10, ba, inSref}, each 0 or 1 except ba. row indexes T37 below. */
+  function decodePins(p) {
+    let hit = false, odd = false, c = "ACT", row = -1;
+    const pins = "" + p.ras + p.cas + p.we;
+    const idle = p.cs === 1 || pins === "111";
+    if (p.ckePrev === 1 && p.cke === 1) {
+      if (p.cs === 0) {
+        hit = true;
+        switch (pins) {
+          case "000": hit = false; odd = true; row = 0; break;
+          case "001": c = "REF"; row = 1; break;
+          case "010": c = p.a10 ? "PREA" : "PRE"; row = 2; break;
+          case "011": c = "ACT"; row = 3; break;
+          case "100": c = p.a10 ? "WRA" : "WR"; row = 4; break;
+          case "101": c = p.a10 ? "RDA" : "RD"; row = 5; break;
+          default: hit = false; row = 9;
+        }
+      } else row = 9;
+    } else if (p.ckePrev === 1 && p.cke === 0) {
+      if (p.cs === 0 && pins === "001") { hit = true; c = "SRE"; row = 6; }
+      else if (idle) { hit = true; c = "PDE"; row = 7; }
+      else odd = true;
+    } else if (p.ckePrev === 0 && p.cke === 1) {
+      if (idle) { hit = true; c = p.inSref ? "SRX" : "PDX"; row = 8; }
+      else odd = true;
+    }
+    return { hit, odd, cmd: hit ? c : null, tid: hit ? tid(c, p.ba) : null, row };
+  }
+  /* CORE2-END */
+
+  /* ---------- 1. Toolchain diagram ---------- */
+  (() => {
+    const svg = $("flow"), out = $("flowOut"), A = arrowDefs(svg);
+    const N = {
+      net:  { x: 20, y: 30, w: 170, h: 64, cls: "dp", t: ["Upstream net", "DRAMPyML, 4ab21b5"], d: "third_party/DRAMBench, by Normal Computing and Fraunhofer IESE. It builds the DDR2 net: places, 12 commands and arcs. The net is the ground truth." },
+      nets: { x: 230, y: 30, w: 150, h: 64, cls: "dp", t: ["tools/net.py", "pick config, fold"], d: "Builds the upstream net for one of three configs: upstream (published memspec, 2 banks), upstream_8bank, and ddr2_800 (Micron -25E timing, 8 banks). It folds every symbolic timing into an integer." },
+      gen:  { x: 420, y: 30, w: 150, h: 64, cls: "dp", t: ["tools/gen_vhdl.py", "one row per arc"], d: "Writes one ARCS table row for each arc (kinds ARC_IN, ARC_OUT, ARC_INHIBIT, ARC_RESET, ARC_TIMED, ARC_CUSTOM). It also writes the place tables and T_ID, which maps a command and a bank to a transition id." },
+      pkg:  { x: 610, y: 30, w: 190, h: 64, cls: "mem", t: ["net_pkg.vhd", "build/<config>/"], d: "Generated VHDL package. For the upstream config it has 18 transitions, 7 places and 282 arcs. The 8-bank configs have 54 transitions, 13 places and 1,764 arcs. arcs.tsv names each arc." },
+      pins: { x: 20, y: 190, w: 190, h: 64, cls: "box", t: ["DDR2 pins", "CKE CS# RAS# CAS# WE# A10 BA"], d: "The command bus of a DDR2 part, sampled on each rising clock edge." },
+      dec:  { x: 250, y: 190, w: 160, h: 64, cls: "ctl", t: ["ddr2_cmd_decode", "pins to transition id"], d: "Decodes the pins as in Table 37 of the Micron datasheet. It keeps the last CKE value and an in-self-refresh flag, to tell SRX from PDX. It flags LOAD MODE as unmodelled." },
+      mon:  { x: 470, y: 190, w: 170, h: 64, cls: "ctl", t: ["petri_monitor", "runs the tables"], d: "A generic entity. It keeps an age counter for each transition, a token count for each place and token-age FIFOs for timed places. It checks the arcs, ages the state, and fires legal commands. Illegal commands are flagged and ignored." },
+      outp: { x: 700, y: 190, w: 240, h: 64, cls: "box", t: ["violation, first_arc", "unmodelled, violations"], d: "ddr2_bus_monitor sets violation one cycle after an illegal command. first_arc is the lowest-numbered blocking arc." },
+      tbd:  { x: 250, y: 280, w: 160, h: 36, cls: "flt", t: ["tb_decode (60 checks)"], d: "Drives the 6 bank commands on each of the 8 banks, the 6 rank commands, NOP and DESELECT, LOAD MODE and malformed CKE edges. It requires the decoder to give the expected transition id or flag." },
+      orc:  { x: 230, y: 350, w: 150, h: 64, cls: "dp", t: ["tools/oracle.py", "net + blocking arcs"], d: "Replays a trace through the upstream can_fire_transition and fire_transition. It also names the arcs that block each command, and checks that list against the upstream verdict." },
+      trg:  { x: 420, y: 350, w: 150, h: 64, cls: "dp", t: ["tools/tracegen.py", "walks, probes, noise"], d: "Makes random-walk traces. It picks a command, finds the earliest legal cycle, sometimes probes one cycle early, and sometimes adds a random command. The oracle gives the expected verdict for each command." },
+      trc:  { x: 600, y: 350, w: 120, h: 64, cls: "mem", t: ["trace.txt", ""], d: "One line for each command: the cycle, the transition id, the expected verdict and the blocking arc ids." },
+      tbm:  { x: 750, y: 350, w: 190, h: 64, cls: "flt", t: ["tb_monitor", "compare every verdict"], d: "Replays trace.txt into petri_monitor. It requires the same verdict and the same set of blocking arcs on every command. It stops at the first difference." }
+    };
+    const edges = [
+      ["net", "nets", "r", "l"], ["nets", "gen", "r", "l"], ["gen", "pkg", "r", "l"], ["pins", "dec", "r", "l"], ["dec", "mon", "r", "l"], ["mon", "outp", "r", "l"],
+      ["orc", "trg", "r", "l"], ["trg", "trc", "r", "l"], ["trc", "tbm", "r", "l"]
+    ];
+    const side = (id, s) => { const n = N[id]; return { r: [n.x + n.w, n.y + n.h / 2], l: [n.x, n.y + n.h / 2], t: [n.x + n.w / 2, n.y], b: [n.x + n.w / 2, n.y + n.h] }[s]; };
+    const line = (d, label, lx, ly) => { el("path", { d, class: "wire", "marker-end": A }, svg); if (label) el("text", { x: lx, y: ly, "font-size": 10, class: "t-muted", "text-anchor": "middle" }, svg, label); };
+    edges.forEach(([a, b, sa, sb]) => { const p = side(a, sa), q = side(b, sb); line(`M${p[0]} ${p[1]} H${q[0]}`); });
+    el("rect", { x: 236, y: 170, width: 424, height: 100, rx: 8, fill: "none", stroke: "var(--accent)", "stroke-dasharray": "5 4" }, svg);
+    el("text", { x: 432, y: 287, "font-size": 10, fill: "var(--accent)" }, svg, "ddr2_bus_monitor");
+    line("M705 94 V150 H555 V190", "tables", 630, 144);
+    line("M105 94 V140 H8 V382 H230", "can_fire_transition", 120, 374);
+    line("M380 382 H420", null);
+    line("M555 254 V310 H845 V350", "verdict + arcs", 700, 304);
+    line("M330 254 V280", null);
+    el("path", { d: "M640 94 V130 H330 V190", class: "wire", "stroke-dasharray": "3 3", "marker-end": A }, svg);
+    el("text", { x: 480, y: 124, "font-size": 10, class: "t-muted", "text-anchor": "middle" }, svg, "T_ID");
+    for (const id in N) {
+      const n = N[id], g = el("g", { tabindex: 0, role: "button", "aria-label": n.t[0] }, svg);
+      el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: 6, class: "box " + n.cls }, g);
+      el("text", { x: n.x + n.w / 2, y: n.y + (n.t[1] ? n.h / 2 - 2 : n.h / 2 + 4), "text-anchor": "middle", "font-size": 12, "font-weight": 600 }, g, n.t[0]);
+      if (n.t[1]) el("text", { x: n.x + n.w / 2, y: n.y + n.h / 2 + 15, "text-anchor": "middle", "font-size": 10, class: "t-muted" }, g, n.t[1]);
+      press(g, () => { out.textContent = n.t[0] + ". " + n.d; });
+    }
+    out.textContent = "Select a box for its job.";
+  })();
+
+  /* ---------- 2. The net (one bank) ---------- */
+  (() => {
+    const svg = $("netfig"), A = arrowDefs(svg);
+    const KIND = {
+      I: { name: "Arc (in)", color: "var(--accent)", dash: "", text: "Arc from a place to a transition. The transition needs at least the weight in tokens. Firing takes them." },
+      O: { name: "Arc (out)", color: "var(--ink)", dash: "", text: "Arc from a transition to a place. Firing puts tokens in the place." },
+      H: { name: "InhibitorArc", color: "var(--bad)", dash: "6 4", text: "The transition is blocked while the place holds tokens. ACTIVE blocks a second ACT on the same bank. PDN and SREF block most commands." },
+      R: { name: "ResetArc", color: "var(--fault)", dash: "2 4", text: "Firing the transition empties the place. PRE and PREA empty ACTIVE. A reset arc never blocks." },
+      T: { name: "TimedArc", color: "var(--data)", dash: "", text: "The transition needs tokens that are old enough. NAW_Pool holds 4 tokens. An ACT needs one that is at least tFAW old. CMD_BUS lets one command in each cycle." },
+      C: { name: "CustomArc", color: "var(--muted)", dash: "8 3 2 3", text: "A timing bound from one transition to another. The destination is blocked while cycles since the source fired are fewer than the bound. This is how tRCD, tRAS, tRC, tRP and all other bounds work. Section 3 shows them." }
+    };
+    const P = { ACTIVE: [330, 150], NAW: [105, 45] };
+    const T = { ACT: [105, 150], RD: [600, 40], WR: [600, 105], RDA: [600, 170], WRA: [600, 235], PRE: [260, 290], PREA: [420, 290] };
+    const arcs = [
+      ["T", "NAW", "ACT", -22], ["O", "ACT", "NAW", 22], ["O", "ACT", "ACTIVE", -16], ["H", "ACTIVE", "ACT", 16],
+      ["I", "ACTIVE", "RD", 14], ["O", "RD", "ACTIVE", -14], ["I", "ACTIVE", "WR", 14], ["O", "WR", "ACTIVE", -14],
+      ["I", "ACTIVE", "RDA", 0], ["I", "ACTIVE", "WRA", 0], ["R", "ACTIVE", "PRE", 0], ["R", "ACTIVE", "PREA", 0]
+    ];
+    const pos = id => P[id] || T[id];
+    const lines = [];
+    arcs.forEach(([k, a, b, off]) => {
+      const [x1, y1] = pos(a), [x2, y2] = pos(b);
+      const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len;
+      const clip = id => (P[id] ? 28 : Math.min(46 / Math.max(Math.abs(ux), 0.001), 22 / Math.max(Math.abs(uy), 0.001)) + 4);
+      const sx = x1 + ux * clip(a), sy = y1 + uy * clip(a), ex = x2 - ux * clip(b), ey = y2 - uy * clip(b);
+      const mx = (sx + ex) / 2 - uy * off * 2, my = (sy + ey) / 2 + ux * off * 2;
+      const kd = KIND[k];
+      const p = el("path", { d: `M${sx} ${sy} Q${mx} ${my} ${ex} ${ey}`, fill: "none", stroke: kd.color, "stroke-width": 2, "stroke-dasharray": kd.dash, "marker-end": A }, svg);
+      lines.push([k, p]);
+    });
+    el("circle", { cx: P.ACTIVE[0], cy: P.ACTIVE[1], r: 24, class: "box ctl" }, svg);
+    el("text", { x: P.ACTIVE[0], y: P.ACTIVE[1] + 4, "text-anchor": "middle", "font-size": 10, "font-weight": 600 }, svg, "ACTIVE");
+    el("text", { x: P.ACTIVE[0], y: P.ACTIVE[1] + 44, "text-anchor": "middle", "font-size": 10, class: "t-muted" }, svg, "1 for each bank");
+    el("circle", { cx: P.NAW[0], cy: P.NAW[1], r: 24, class: "box flt" }, svg);
+    el("text", { x: P.NAW[0], y: P.NAW[1] + 4, "text-anchor": "middle", "font-size": 10, "font-weight": 600 }, svg, "NAW ×4");
+    el("text", { x: 150, y: 20, "font-size": 10, class: "t-muted" }, svg, "tFAW pool, 4 tokens");
+    for (const id in T) {
+      const [x, y] = T[id];
+      el("rect", { x: x - 40, y: y - 17, width: 80, height: 34, rx: 5, class: "box dp" }, svg);
+      el("text", { x, y: y + 4, "text-anchor": "middle", "font-size": 12, "font-weight": 600 }, svg, id);
+    }
+    el("text", { x: 560, y: 300, "font-size": 11, class: "t-muted", "text-anchor": "start" }, svg, "Every command also has a timed");
+    el("text", { x: 560, y: 316, "font-size": 11, class: "t-muted", "text-anchor": "start" }, svg, "arc to and from CMD_BUS.");
+    const btns = $("kindBtns"), out = $("kindOut");
+    const show = k => {
+      [...btns.children].forEach(b => b.setAttribute("aria-pressed", b.dataset.k === k));
+      lines.forEach(([kk, p]) => { p.style.opacity = kk === k ? 1 : 0.15; });
+      out.textContent = KIND[k].name + ". " + KIND[k].text;
+    };
+    Object.keys(KIND).forEach(k => { const b = hh("button", { type: "button", "data-k": k }, btns, KIND[k].name); b.style.borderLeft = "5px solid " + KIND[k].color; b.addEventListener("click", () => show(k)); });
+    show("T");
+    const tb = $("arcCounts");
+    const COUNTS = [["upstream", 18, 7, 2, [10, 29, 31, 5, 20, 187], 282], ["upstream_8bank", 54, 13, 8, [34, 89, 97, 17, 62, 1465], 1764], ["ddr2_800", 54, 13, 8, [34, 89, 97, 17, 62, 1465], 1764]];
+    const hr = hh("tr", {}, tb);
+    ["Config", "Banks", "Transitions", "Places", "Arc (in)", "Arc (out)", "Inhibitor", "Reset", "Timed", "Custom", "Total"].forEach(t => hh("th", {}, hr, t));
+    COUNTS.forEach(([n, t, p, b, k, tot]) => { const r = hh("tr", {}, tb); hh("td", { class: "mono" }, r, n); [b, t, p, ...k, tot].forEach(v => hh("td", { class: "n" }, r, fmt(v))); });
+  })();
+
+  /* ---------- 3. Live monitor ---------- */
+  (() => {
+    const CMDS = ["ACT0", "RD0", "WR0", "PRE0", "ACT1", "RD1", "WR1", "PRE1", "PREA"];
+    const label = c => c === "PREA" ? "PREA" : c.slice(0, -1) + " b" + c.slice(-1);
+    const PRESETS = {
+      "Probe tRCD": ["ddr2_800", [[0, "ACT0"], [4, "RD0"], [5, "RD0"]]],
+      "Audit 1": ["ddr2_800", [[0, "ACT0"], [20, "ACT1"], [26, "PRE0"]]],
+      "Audit 2": ["ddr2_800", [[0, "ACT0"], [1, "PREA"]]],
+      "Audit 3": ["ddr2_800", [[0, "ACT0"], [30, "PREA"], [35, "ACT1"]]],
+      "Audit 4": ["ddr2_800", [[0, "ACT0"], [5, "RD0"], [7, "RD0"]]],
+      "Audit 5": ["ddr2_800", [[0, "ACT0"], [5, "WR0"], [7, "WR0"]]],
+      "Audit 9": ["upstream", [[0, "ACT0"], [10, "RD0"], [16, "WR0"]]]
+    };
+    let cfg = "ddr2_800", cmds = [];
+    const out = $("monOut"), tb = $("monTable"), cfgBtns = $("cfgBtns");
+    const CFGS = [["ddr2_800", "ddr2_800 (Micron -25E)"], ["upstream", "upstream (published memspec)"]];
+    CFGS.forEach(([k, t]) => { const b = hh("button", { type: "button", "data-k": k }, cfgBtns, t); b.addEventListener("click", () => { cfg = k; cmds = []; render(); }); });
+    const waitEl = $("wait");
+    const lastCycle = () => (cmds.length ? cmds[cmds.length - 1].cycle : -1);
+    CMDS.forEach(c => { const b = hh("button", { type: "button" }, $("cmdBtns"), label(c)); b.addEventListener("click", () => {
+      let w = Math.round(Number(waitEl.value)); if (!Number.isFinite(w)) w = 1; w = Math.min(250, Math.max(1, w)); waitEl.value = w;
+      cmds.push({ cycle: cmds.length ? lastCycle() + w : 0, cmd: c }); render(); }); });
+    $("undoBtn").addEventListener("click", () => { cmds.pop(); render(); });
+    $("clearBtn").addEventListener("click", () => { cmds = []; render(); });
+    const loadPreset = k => { cfg = PRESETS[k][0]; cmds = PRESETS[k][1].map(([cycle, cmd]) => ({ cycle, cmd })); render(); };
+    Object.keys(PRESETS).forEach(k => { const b = hh("button", { type: "button" }, $("presetBtns"), k); b.addEventListener("click", () => loadPreset(k)); });
+    window.__loadPreset = loadPreset;
+
+    const arcText = a => {
+      if (a.k === "C") return `#${a.id} ${a.src} to ${a.dst}: bound ${a.bound}${a.ex.length <= 8 ? " (" + a.ex + ")" : ""}, age ${a.have >= NET[cfg].agemax ? "never fired" : a.have}`;
+      if (a.k === "I") return `#${a.id} ${a.src} has ${a.have} tokens, needs ${a.bound}`;
+      if (a.k === "H") return `#${a.id} ${a.src} holds ${a.have} token (inhibitor)`;
+      return `#${a.id} ${a.src}: ${a.have} tokens at least ${a.bound} old, needs ${a.w}`;
+    };
+    function drawTimeline(rows) {
+      const svg = $("tl"); svg.textContent = "";
+      const last = rows.length ? rows[rows.length - 1].cycle : 0, span = Math.max(20, last + 4);
+      const x0 = 90, x = c => x0 + (c / span) * (860 - x0);
+      const lanes = { 0: 40, 1: 80, A: 120 };
+      [["bank 0", 0], ["bank 1", 1], ["PREA", "A"]].forEach(([t, k]) => { el("text", { x: 8, y: lanes[k] + 4, "font-size": 11, class: "t-muted" }, svg, t); el("path", { d: `M${x0} ${lanes[k]} H860`, stroke: "var(--line)" }, svg); });
+      const step = span > 120 ? 20 : span > 60 ? 10 : 5;
+      for (let c = 0; c <= span; c += step) { el("path", { d: `M${x(c)} 24 V138`, stroke: "var(--line)", "stroke-dasharray": "2 4" }, svg); el("text", { x: x(c), y: 156, "text-anchor": "middle", "font-size": 10, class: "t-muted" }, svg, c); }
+      rows.forEach(r => {
+        const lane = r.cmd === "PREA" ? "A" : r.cmd.slice(-1), name = r.cmd === "PREA" ? "PREA" : r.cmd.slice(0, -1);
+        const g = el("g", {}, svg), cx = x(r.cycle), y = lanes[lane];
+        el("rect", { x: cx - 3, y: y - 12, width: 6, height: 24, rx: 2, fill: r.legal ? "var(--accent)" : "var(--bad-soft)", stroke: r.legal ? "var(--accent)" : "var(--bad)", "stroke-width": 1.5 }, g);
+        el("text", { x: cx + 6, y: y - 14, "font-size": 10, fill: r.legal ? "var(--ink)" : "var(--bad)" }, g, name);
+      });
+    }
+    function render() {
+      [...cfgBtns.children].forEach(b => b.setAttribute("aria-pressed", b.dataset.k === cfg));
+      const { rows, S } = simulate(cfg, cmds);
+      tb.textContent = "";
+      const hr = hh("tr", {}, tb);
+      ["#", "Cycle", "Command", "Verdict", "Blocking arcs, or earliest legal cycle"].forEach(t => hh("th", {}, hr, t));
+      rows.forEach((r, i) => {
+        const tr = hh("tr", {}, tb); if (r.legal) tr.className = "hit";
+        hh("td", { class: "n" }, tr, i + 1); hh("td", { class: "n" }, tr, r.cycle); hh("td", { class: "mono" }, tr, label(r.cmd));
+        const v = hh("td", {}, tr); hh("span", { class: "status" + (r.legal ? " ok" : "") }, v, r.legal ? "legal" : "illegal");
+        const td = hh("td", {}, tr);
+        if (r.legal) td.textContent = "none";
+        else {
+          const first = r.blocked[0];
+          r.blocked.forEach(a => hh("div", { class: "mono cap" }, td, (a === first ? "first: " : "") + arcText(a)));
+          hh("div", { class: "cap" }, td, r.earliest === null ? "Waiting does not help. Another command must come first." : "Earliest legal cycle: " + r.earliest);
+        }
+      });
+      drawTimeline(rows);
+      const net = NET[cfg], nb = rows.filter(r => !r.legal).length;
+      const open = b => (S.pl["ACTIVE[b" + b + "]"].count ? "open" : "closed");
+      const naw = S.pl.NAW_Pool;
+      out.textContent = rows.length
+        ? `${cfg}: ${rows.length} commands, ${nb} illegal. Bank 0 ${open(0)}, bank 1 ${open(1)}. NAW_Pool holds ${naw.count} tokens (tFAW = ${net.arcs.find(a => a[1] === "T" && a[2] === "NAW_Pool")[5]}).`
+        : `${cfg}: no commands yet. Both banks are closed. NAW_Pool holds ${naw.count} tokens.`;
+    }
+    loadPreset("Probe tRCD");
+  })();
+
+  /* ---------- 4. Steps and pipeline ---------- */
+  (() => {
+    const STEPS = [
+      ["1 · Check", "For the incoming transition, test each arc that points at it. ARC_IN blocks if the place has too few tokens. ARC_INHIBIT blocks if the place has tokens. ARC_TIMED blocks if too few tokens are old enough. ARC_CUSTOM blocks while age(src) is less than the bound. Reset and out arcs never block. The result is one bit for each arc, the blocked vector."],
+      ["2 · Age", "Time advances for everything. Each transition age and each token age goes up by 1. Ages stop at AGE_MAX, which means never fired. AGE_MAX is 201 in the generated configs, and it must be more than every bound."],
+      ["3 · Fire", "If no arc blocks, the command fires. First it takes tokens from the places of its ARC_IN and ARC_TIMED arcs, oldest first. Then it empties the places of its ARC_RESET arcs. Then it puts tokens in the places of its ARC_OUT arcs. Last, its own age becomes 1. An illegal command skips this step."]
+    ];
+    const b = $("stepBtns"), title = $("stepTitle"), text = $("stepText");
+    STEPS.forEach((s, i) => { const x = hh("button", { type: "button" }, b, s[0]); x.addEventListener("click", () => { [...b.children].forEach(y => y.setAttribute("aria-pressed", y === x)); title.textContent = s[0]; text.textContent = s[1]; }); });
+    b.children[0].click();
+    let illegalB = false;
+    const pb = $("pipeBtns");
+    [["B legal", false], ["B illegal", true]].forEach(([t, v]) => { const x = hh("button", { type: "button" }, pb, t); x.addEventListener("click", () => { illegalB = v; [...pb.children].forEach(y => y.setAttribute("aria-pressed", y === x)); draw(); }); });
+    const svg = $("wave");
+    function draw() {
+      svg.textContent = "";
+      const x0 = 150, cw = 90, n = 7, X = c => x0 + c * cw;
+      const names = ["clk", "cmd_valid", "cmd_t", "verdict_valid", "verdict_legal", "violation", "violations"];
+      const rowY = i => 40 + i * 42;
+      for (let c = 0; c <= n; c++) { el("path", { d: `M${X(c)} 20 V310`, stroke: "var(--line)", "stroke-dasharray": "2 4" }, svg); if (c < n) el("text", { x: X(c) + cw / 2, y: 322, "text-anchor": "middle", "font-size": 10, class: "t-muted" }, svg, "cycle " + c); }
+      names.forEach((nm, i) => el("text", { x: 8, y: rowY(i) + 4, "font-size": 12 }, svg, nm));
+      const bit = (i, vals, color) => {
+        const y = v => rowY(i) + (v ? -10 : 10); let d = "";
+        vals.forEach((v, c) => { d += (c === 0 ? `M${X(0)} ${y(v)} ` : `L${X(c)} ${y(vals[c - 1])} L${X(c)} ${y(v)} `) + `L${X(c + 1)} ${y(v)} `; });
+        el("path", { d, fill: "none", stroke: color, "stroke-width": 2 }, svg);
+      };
+      let clk = ""; for (let c = 0; c < n; c++) { const a = X(c), m = a + cw / 2, e = a + cw; clk += (c === 0 ? `M${a} 50 ` : `L${a} 50 `) + `L${a} 30 L${m} 30 L${m} 50 L${e} 50 `; }
+      el("path", { d: clk, fill: "none", stroke: "var(--muted)", "stroke-width": 1.5 }, svg);
+      const cv = [0, 1, 0, 0, 1, 0, 0], vv = [0, 0, 1, 0, 0, 1, 0], vl = [0, 0, 1, 0, 0, illegalB ? 0 : 1, 0], viol = [0, 0, 0, 0, 0, illegalB ? 1 : 0, 0];
+      bit(1, cv, "var(--data)"); bit(3, vv, "var(--accent)"); bit(4, vl, "var(--accent)"); bit(5, viol, "var(--bad)");
+      const busBox = (i, c0, c1, txt, color) => { el("rect", { x: X(c0) + 2, y: rowY(i) - 11, width: (c1 - c0) * cw - 4, height: 22, rx: 4, fill: "var(--surface)", stroke: color, "stroke-width": 1.5 }, svg); el("text", { x: X(c0) + ((c1 - c0) * cw) / 2, y: rowY(i) + 4, "text-anchor": "middle", "font-size": 11 }, svg, txt); };
+      busBox(2, 1, 2, "t of A", "var(--data)"); busBox(2, 4, 5, "t of B", "var(--data)");
+      busBox(6, 0, 5, "0", "var(--muted)"); busBox(6, 5, 7, illegalB ? "1" : "0", illegalB ? "var(--bad)" : "var(--muted)");
+      el("path", { d: `M${X(1) + cw / 2} 80 L${X(2) + cw / 2} 160`, class: "wire", "marker-end": arrowDefs(svg) }, svg);
+      el("text", { x: X(1) + cw / 2 + 8, y: 112, "font-size": 10, class: "t-muted" }, svg, "1 cycle");
+      el("text", { x: X(4) + 6, y: 270, "font-size": 10, class: "t-muted" }, svg, illegalB ? "first_arc = lowest blocked arc id" : "no violation");
+    }
+    pb.children[0].click();
+  })();
+
+  /* ---------- 5. Pin decoder ---------- */
+  (() => {
+    const T37 = [
+      ["H H", "L", "L L L", "-", "LOAD MODE", "flagged, no command"],
+      ["H H", "L", "L L H", "-", "REFRESH", "REF"],
+      ["H H", "L", "L H L", "L / H", "PRECHARGE / PRECHARGE ALL", "PRE (bank) / PREA"],
+      ["H H", "L", "L H H", "-", "ACTIVATE", "ACT (bank)"],
+      ["H H", "L", "H L L", "L / H", "WRITE / WRITE with auto precharge", "WR / WRA"],
+      ["H H", "L", "H L H", "L / H", "READ / READ with auto precharge", "RD / RDA"],
+      ["H L", "L", "L L H", "-", "SELF REFRESH entry", "SRE"],
+      ["H L", "H, or L", "H H H", "-", "power-down entry", "PDE"],
+      ["L H", "H, or L", "H H H", "-", "exit", "SRX if in self refresh, else PDX"],
+      ["H H, or L L", "H, or L", "H H H", "-", "NOP or DESELECT", "no command"]
+    ];
+    const tb = $("t37"), hr = hh("tr", {}, tb);
+    ["CKE prev, cur", "CS#", "RAS# CAS# WE#", "A10", "Datasheet name", "Decoder output"].forEach(t => hh("th", {}, hr, t));
+    const trs = T37.map(r => { const tr = hh("tr", {}, tb); r.forEach((c, i) => hh("td", { class: i === 5 ? "mono" : "" }, tr, c)); return tr; });
+    const sels = {};
+    const defs = [["ckePrev", "CKE previous"], ["cke", "CKE"], ["cs", "CS#"], ["ras", "RAS#"], ["cas", "CAS#"], ["we", "WE#"], ["a10", "A10"], ["ba", "BA"], ["inSref", "In self refresh"]];
+    defs.forEach(([k, t]) => {
+      const l = hh("label", {}, $("pinSel"), t), s = hh("select", { "aria-label": t }, l);
+      if (k === "ba") for (let i = 0; i < 8; i++) hh("option", { value: i }, s, String(i));
+      else if (k === "inSref") { hh("option", { value: 0 }, s, "no"); hh("option", { value: 1 }, s, "yes"); }
+      else { hh("option", { value: 1 }, s, "H"); hh("option", { value: 0 }, s, "L"); }
+      s.addEventListener("change", update); sels[k] = s;
+    });
+    const read = () => { const p = {}; defs.forEach(([k]) => { const v = Number(sels[k].value); p[k] = Number.isInteger(v) && v >= 0 && v <= 7 ? v : 0; }); return p; };
+    const ENC = {
+      REF: [1, 1, 0, 0, 0, 1, 0, 0], PRE: [1, 1, 0, 0, 1, 0, 0, 0], PREA: [1, 1, 0, 0, 1, 0, 1, 0], ACT: [1, 1, 0, 0, 1, 1, 0, 0],
+      WR: [1, 1, 0, 1, 0, 0, 0, 0], WRA: [1, 1, 0, 1, 0, 0, 1, 0], RD: [1, 1, 0, 1, 0, 1, 0, 0], RDA: [1, 1, 0, 1, 0, 1, 1, 0],
+      SRE: [1, 0, 0, 0, 0, 1, 0, 0], PDE: [1, 0, 0, 1, 1, 1, 0, 0], PDX: [0, 1, 0, 1, 1, 1, 0, 0], SRX: [0, 1, 0, 1, 1, 1, 0, 1]
+    };
+    const KEYS = ["ckePrev", "cke", "cs", "ras", "cas", "we", "a10"];
+    Object.keys(ENC).forEach(c => { const b = hh("button", { type: "button" }, $("encBtns"), c); b.addEventListener("click", () => { const e = ENC[c]; KEYS.forEach((k, i) => { sels[k].value = e[i]; }); sels.inSref.value = c === "SRX" ? 1 : 0; update(); }); });
+    function update() {
+      const p = read(), d = decodePins(p), out = $("decOut");
+      trs.forEach((tr, i) => tr.className = i === d.row ? "hit" : "");
+      const bankCmd = d.cmd in BANK_CMDS;
+      if (d.hit) out.innerHTML = `<div class="verdict ok">${d.cmd}${bankCmd ? " bank " + p.ba : " (rank)"}: transition id ${d.tid}</div><div class="mono cap">cmd_valid = 1 · unmodelled = 0 · cmd_t = T_ID(${d.cmd})(${p.ba}) = ${d.tid}</div>`;
+      else if (d.odd) out.innerHTML = `<div class="verdict warn">Flagged: unmodelled = 1. No command goes to the monitor.</div><div class="mono cap">LOAD MODE, or a pattern that is not valid on a CKE edge.</div>`;
+      else out.innerHTML = `<div class="verdict">No command (cmd_valid = 0).</div><div class="mono cap">NOP, DESELECT, burst terminate pattern, or CKE held low.</div>`;
+    }
+    $("encBtns").children[3].click();
+  })();
+
+  /* ---------- 6. Results ---------- */
+  (() => {
+    const R = [["upstream", 2, 30043, 20787, 9256, 282341, ""], ["upstream_8bank", 8, 30035, 21783, 8252, 194750, ""], ["ddr2_800", 8, 30041, 22177, 7864, 133566, ""]];
+    const svg = $("res"), out = $("resOut");
+    const x0 = 160, W = 680, S = W / 30100, rowH = 64;
+    el("text", { x: x0, y: 18, "font-size": 11, class: "t-muted" }, svg, "commands in 200 traces (to scale)");
+    [0, 10000, 20000, 30000].forEach(v => { el("path", { d: `M${x0 + v * S} 26 V${26 + rowH * 3}`, stroke: "var(--line)", "stroke-dasharray": "2 4" }, svg); el("text", { x: x0 + v * S, y: 40 + rowH * 3, "text-anchor": "middle", "font-size": 10, class: "t-muted" }, svg, fmt(v)); });
+    const hl = [];
+    R.forEach((r, i) => {
+      const y = 34 + i * rowH, g = el("g", { tabindex: 0, role: "button", "aria-label": r[0] + ": commands" }, svg);
+      const bg = el("rect", { x: 4, y: y - 6, width: 872, height: rowH - 8, rx: 4, fill: "transparent" }, g); hl.push(bg);
+      el("text", { x: 10, y: y + 24, "font-size": 12 }, g, r[0]);
+      el("rect", { x: x0, y: y + 4, width: r[3] * S, height: 34, fill: "var(--accent-soft)", stroke: "var(--accent)", "stroke-width": 1.5 }, g);
+      el("rect", { x: x0 + r[3] * S, y: y + 4, width: r[4] * S, height: 34, fill: "var(--fault-soft)", stroke: "var(--fault)", "stroke-width": 1.5 }, g);
+      el("text", { x: x0 + r[3] * S / 2, y: y + 26, "text-anchor": "middle", "font-size": 11, "font-weight": 600 }, g, fmt(r[3]));
+      el("text", { x: x0 + (r[3] + r[4] / 2) * S, y: y + 26, "text-anchor": "middle", "font-size": 11, "font-weight": 600 }, g, fmt(r[4]));
+      press(g, () => { hl.forEach(h => h.setAttribute("fill", "transparent")); bg.setAttribute("fill", "var(--accent-soft)"); pick(r); });
+    });
+    function pick(r) {
+      const pct = (100 * r[4] / r[2]).toFixed(1), cpc = (r[5] / r[2]).toFixed(2);
+      out.textContent = `${r[0]} (${r[1]} banks): ${fmt(r[2])} commands, ${fmt(r[3])} legal, ${fmt(r[4])} illegal (${pct}%), ${fmt(r[5])} cycles (${cpc} cycles for each command). Mismatches: 0.`;
+    }
+    pick(R[0]);
+    const sv2 = $("cyc"), S2 = 680 / 290000;
+    el("text", { x: x0, y: 18, "font-size": 11, class: "t-muted" }, sv2, "simulated cycles (to scale)");
+    [0, 100000, 200000, 300000].filter(v => v <= 290000).forEach(v => { el("path", { d: `M${x0 + v * S2} 26 V${26 + 46 * 3}`, stroke: "var(--line)", "stroke-dasharray": "2 4" }, sv2); el("text", { x: x0 + v * S2, y: 40 + 46 * 3, "text-anchor": "middle", "font-size": 10, class: "t-muted" }, sv2, fmt(v)); });
+    R.forEach((r, i) => { const y = 30 + i * 46; el("text", { x: 10, y: y + 20, "font-size": 12 }, sv2, r[0]); el("rect", { x: x0, y: y + 4, width: r[5] * S2, height: 26, fill: "var(--data-soft)", stroke: "var(--data)", "stroke-width": 1.5 }, sv2); el("text", { x: x0 + r[5] * S2 + 6, y: y + 22, "font-size": 11, "font-weight": 600 }, sv2, fmt(r[5])); });
+  })();
+
+  /* ---------- 7. Memspec table ---------- */
+  (() => {
+    const U = { tCCD: 4, tFAW: 24, tPD: 3, tRAS: 28, tRC: 38, tRCD: 10, tRFC: 88, tRL: 10, tRP: 10, tRRD: 5, tRTP: 6, tRTRS: 1, tWL: 8, tWR: 12, tWTR: 6, tXARD: 2, tXP: 6, tXSNR: 2, tXSRD: 200, nbrOfBanks: 2 };
+    const D3 = { tCCD: 4, tFAW: 24, tPD: 3, tRAS: 28, tRC: 38, tRCD: 10, tRFC: 88, tRL: 10, tRP: 10, tRRD: 5, tRTP: 6, tRTRS: 1, tWL: 8, tWR: 12, tWTR: 6, nbrOfBanks: 8, tXP: 6 };
+    const D2 = { tCCD: 2, tFAW: 18, tPD: 3, tRAS: 16, tRC: 23, tRCD: 5, tRFC: 51, tRL: 5, tRP: 5, tRRD: 4, tRTP: 3, tWL: 4, tWR: 6, tWTR: 3, tXP: 2, tXSNR: 55, tXSRD: 200, nbrOfBanks: 8 };
+    const MI = { tCCD: 2, tFAW: 18, tPD: 3, tRAS: 16, tRC: 22, tRCD: 5, tRFC: 51, tRL: 5, tRP: 5, tRRD: 4, tRTP: 3, tRTRS: 1, tWL: 4, tWR: 6, tWTR: 3, tXARD: 2, tXP: 2, tXSNR: 55, tXSRD: 200, nbrOfBanks: 8 };
+    const tb = $("memspec"), hr = hh("tr", {}, tb), out = $("memOut");
+    ["Parameter", "DRAMPyML DDR2", "DRAMSys DDR3-1600", "DRAMSys DDR2-800", "Micron -25E (ddr2_800)"].forEach(t => hh("th", {}, hr, t));
+    let same = 0, diff = 0;
+    Object.keys(U).forEach(k => {
+      const tr = hh("tr", { tabindex: 0 }, tb);
+      hh("td", { class: "mono" }, tr, k); hh("td", { class: "n" }, tr, U[k]);
+      [D3[k], D2[k], MI[k]].forEach(v => hh("td", { class: "n" }, tr, v == null ? "-" : v));
+      if (k !== "nbrOfBanks" && D3[k] != null && D3[k] === U[k]) same++;
+      if (k !== "nbrOfBanks" && D3[k] != null && D2[k] != null && D2[k] !== U[k]) diff++;
+      if (k === "nbrOfBanks") tr.className = "diff";
+      press(tr, () => { out.textContent = `${k}: DRAMPyML ${U[k]}, DDR3-1600 file ${D3[k] ?? "not defined"}, DDR2-800 file ${D2[k] ?? "not defined"}, datasheet config ${MI[k]}.`; });
+    });
+    out.textContent = `${same} parameters are shared with the DDR3-1600 file, and all are equal. ${diff} of them differ from the DRAMSys DDR2-800 file. nbrOfBanks is 2 in DRAMPyML, 8 in a 1 Gb DDR2 part.`;
+    tb.querySelectorAll("tr").forEach(tr => { if (tr.children[0] && tr.children[0].textContent === "nbrOfBanks") tr.children[1].style.color = "var(--bad)"; });
+  })();
+
+  /* ---------- 8. Audit table ---------- */
+  (() => {
+    const A = [
+ [
+  "PRE to bank 0 is blocked by an ACT to bank 1",
+  "ddr2_800",
+  "ACT0@0, ACT1@20, PRE0@26",
+  "rejects (ACT[b1] -> PRE[b0] >= 16)",
+  "legal",
+  "Table 39, p. 76: with bank 1 row-active (tRCD met), PRECHARGE to another bank is allowed. Bank 0 has been open 26 cycles, more than tRAS = 16.",
+  "Audit 1"
+ ],
+ [
+  "PREA one cycle after an ACT",
+  "ddr2_800",
+  "ACT0@0, PREA@1",
+  "accepts",
+  "illegal",
+  "Bank 0 has been open 1 cycle; tRAS = 16 (Table 12, p. 39). The model enforces tRAS for PRE on that bank but not for PREA.",
+  "Audit 2"
+ ],
+ [
+  "ACT 5 cycles after PREA",
+  "ddr2_800",
+  "ACT0@0, PREA@30, ACT1@35",
+  "accepts",
+  "illegal",
+  "Note 36, p. 45: tRPA applies after PRECHARGE ALL; for 1 Gb parts tRPA = 15 ns = 6 cycles at -25E (Table 12, p. 39). The model uses tRP = 5.",
+  "Audit 3"
+ ],
+ [
+  "Second READ 2 cycles after the first, burst length 8",
+  "ddr2_800",
+  "ACT0@0, RD0@5, RD0@7",
+  "accepts",
+  "illegal",
+  "p. 95: the next READ is issued BL/2 = 4 cycles after the first. The model uses tCCD alone (2); upstream's tCCD = 4 hides this.",
+  "Audit 4"
+ ],
+ [
+  "Second WRITE 2 cycles after the first, burst length 8",
+  "ddr2_800",
+  "ACT0@0, WR0@5, WR0@7",
+  "accepts",
+  "illegal",
+  "p. 107: the next WRITE is issued BL/2 = 4 cycles after the first.",
+  "Audit 5"
+ ],
+ [
+  "READ 2 cycles after fast power-down exit",
+  "ddr2_800",
+  "ACT0@0, PDE@1, PDX@4, RD0@6",
+  "rejects (PDX -> RD[b0] >= 6)",
+  "legal",
+  "tXARD = 2 cycles for fast exit, MR12 = 0 (Table 12, p. 41). The model applies the slow-exit bound to every exit.",
+  null
+ ],
+ [
+  "READ 6 cycles after slow power-down exit",
+  "ddr2_800",
+  "ACT0@0, PDE@1, PDX@4, RD0@10",
+  "accepts",
+  "illegal",
+  "tXARDS = 8 - AL cycles at -25E for slow exit, MR12 = 1 (Table 12, p. 41). The model's 6 - AL is the DDR2-400/533 value.",
+  null
+ ],
+ [
+  "ACT 2 cycles after self-refresh exit (upstream timing)",
+  "upstream",
+  "SRE@0, SRX@10, ACT0@12",
+  "accepts",
+  "illegal",
+  "tXSNR = tRFC(min) + 10 ns (Table 12, p. 41), 55 cycles at -25E; upstream sets tXSNR = 2.",
+  null
+ ],
+ [
+  "WRITE 6 cycles after READ (upstream timing)",
+  "upstream",
+  "ACT0@0, RD0@10, WR0@16",
+  "rejects (RD[b0] -> WR[b0] >= 7; RD[b0] -> WR[b0] >= 7)",
+  "legal",
+  "WL = RL - 1 (p. 86), so tRL = 10 implies tWL = 9 and the model's own READ-to-WRITE bound tRL + BL/2 + tCK - tWL is 6. Upstream sets tWL = 8, which makes it 7.",
+  "Audit 9"
+ ]
+];
+    const tb = $("audit"), hr = hh("tr", {}, tb);
+    ["#", "Case", "Config", "Sequence (cmd@cycle)", "Model", "Datasheet", "Why", "Monitor"].forEach(t => hh("th", {}, hr, t));
+    A.forEach((r, i) => {
+      const tr = hh("tr", {}, tb);
+      hh("td", { class: "n" }, tr, i + 1); hh("td", {}, tr, r[0]); hh("td", { class: "mono" }, tr, r[1]); hh("td", { class: "mono" }, tr, r[2]);
+      const m = hh("td", {}, tr); hh("span", { class: "status" + (r[3] === "accepts" ? "" : " ") }, m, r[3]);
+      const d = hh("td", {}, tr); hh("span", { class: "status ok" }, d, r[4]);
+      hh("td", {}, tr, r[5]);
+      const td = hh("td", {}, tr);
+      if (r[6]) { const b = hh("button", { type: "button" }, td, "Load"); b.addEventListener("click", () => { window.__loadPreset(r[6]); $("cfgBtns").scrollIntoView({ block: "center" }); }); }
+      else hh("span", { class: "cap" }, td, "uses arcs outside the mini-net");
+    });
+  })();
+})();
+</script>
+</body>
+</html>
