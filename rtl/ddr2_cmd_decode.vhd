@@ -83,8 +83,9 @@ begin
     if bank >= N_BANKS then
       bank := 0;
     end if;
-    cmd_valid <= '1' when hit else '0';
-    unmodelled <= '1' when odd else '0';
+    -- Plain ifs rather than sequential "when" assignments, for older Vivado parsers.
+    if hit then cmd_valid <= '1'; else cmd_valid <= '0'; end if;
+    if odd then unmodelled <= '1'; else unmodelled <= '0'; end if;
     cmd_t <= T_ID(c)(bank);
   end process;
 

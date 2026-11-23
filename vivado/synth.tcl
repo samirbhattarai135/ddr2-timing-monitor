@@ -1,8 +1,8 @@
 # Out-of-context synthesis and implementation of ddr2_bus_monitor on the
 # Nexys A7-100T part, for the ddr2_800 config (8 banks, Micron -25E timing).
-# Not yet run: this repository was developed on a machine without Vivado.
+# Reports go to vivado/reports/<period>/. On Windows, run_synth.ps1 runs both
+# periods below and collects the results.
 #
-#   ./run_sim.sh                                   # generates build/ddr2_800/net_pkg.vhd
 #   cd vivado
 #   vivado -mode batch -source synth.tcl                 # 3.077 ns: the board's MIG clock
 #   vivado -mode batch -source synth.tcl -tclargs 2.5    # DDR2-800 tCK
@@ -13,7 +13,7 @@ set part      xc7a100tcsg324-1
 set period_ns [expr {$argc > 0 ? [lindex $argv 0] : 3.077}]
 set here      [file dirname [file normalize [info script]]]
 set root      [file normalize "$here/.."]
-set out       "$here/reports"
+set out       "$here/reports/$period_ns"
 file mkdir $out
 
 create_project -in_memory -part $part

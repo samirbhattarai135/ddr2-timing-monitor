@@ -135,7 +135,7 @@ N_TRACES=20 N_COMMANDS=60 ./run_sim.sh     # quick run
 
 Needs [nvc](https://github.com/nickg/nvc) (tested with 1.23.1) and Python 3.13. Upstream is pinned at commit `4ab21b5`.
 
-On a machine with Vivado: `cd vivado && vivado -mode batch -source synth.tcl` for the board's 3.077 ns MIG clock, or `-tclargs 2.5` for DDR2-800.
+On Windows with Vivado: `powershell -ExecutionPolicy Bypass -File run_synth.ps1` places and routes at 3.077 ns (the board's MIG clock) and 2.5 ns (DDR2-800 tCK) and writes `results_windows.txt`. Elsewhere: `cd vivado && vivado -mode batch -source synth.tcl [-tclargs PERIOD_NS]`.
 
 ## Files
 
@@ -155,6 +155,7 @@ On a machine with Vivado: `cd vivado && vivado -mode batch -source synth.tcl` fo
 | `tb/tb_decode.vhd` | Decoder testbench |
 | `build/<config>/net_pkg.vhd`, `arcs.tsv` | Generated tables, kept in git so Vivado needs no Python |
 | `vivado/synth.tcl` | Out-of-context place and route on the Nexys A7-100T part (not yet run) |
+| `run_synth.ps1`, `tools/find_vivado.ps1` | Windows: runs `synth.tcl` at each period and collects `results_windows.txt` |
 | `run_sim.sh` | Runs everything above |
 
 ## Related work
