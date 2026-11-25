@@ -35,13 +35,15 @@ CASES = [
          "ddr2_800", ((0, "ACT", 0), (30, "PREA", None), (35, "ACT", 1)), False,
          "Note 36, p. 45: tRPA applies after PRECHARGE ALL; for 1 Gb parts "
          "tRPA = 15 ns = 6 cycles at -25E (Table 12, p. 39). The model uses tRP = 5."),
-    Case("Second READ 2 cycles after the first, burst length 8",
-         "ddr2_800", ((0, "ACT", 0), (5, "RD", 0), (7, "RD", 0)), False,
-         "p. 95: the next READ is issued BL/2 = 4 cycles after the first. The "
-         "model uses tCCD alone (2); upstream's tCCD = 4 hides this."),
-    Case("Second WRITE 2 cycles after the first, burst length 8",
-         "ddr2_800", ((0, "ACT", 0), (5, "WR", 0), (7, "WR", 0)), False,
-         "p. 107: the next WRITE is issued BL/2 = 4 cycles after the first."),
+    Case("Second READ 3 cycles after the first, burst length 8",
+         "ddr2_800", ((0, "ACT", 0), (5, "RD", 0), (8, "RD", 0)), False,
+         "p. 95 and Figure 49, p. 99: a BL8 READ can be interrupted only by a "
+         "READ exactly 2 cycles later; otherwise the next READ waits BL/2 = 4. "
+         "The model's single bound tCCD = 2 cannot reject 3."),
+    Case("Second WRITE 3 cycles after the first, burst length 8",
+         "ddr2_800", ((0, "ACT", 0), (5, "WR", 0), (8, "WR", 0)), False,
+         "p. 107 and Figure 61, p. 110: a BL8 WRITE can be interrupted only by a "
+         "WRITE exactly 2 cycles later; otherwise the next WRITE waits BL/2 = 4."),
     Case("READ 2 cycles after fast power-down exit",
          "ddr2_800", ((0, "ACT", 0), (1, "PDE", None), (4, "PDX", None), (6, "RD", 0)), True,
          "tXARD = 2 cycles for fast exit, MR12 = 0 (Table 12, p. 41). The model "

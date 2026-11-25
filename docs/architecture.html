@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-D5U/U0xGxLo0BxVW/KvZipk0fGk6H5L8uzM+2RTP/v4='; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-M9lZkFVbQgs+EWWEwQY3UFykvx/yITyBf5U5fDQePtM='; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DDR2 Timing Monitor</title>
@@ -741,21 +741,21 @@ footer { color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--li
   "Audit 3"
  ],
  [
-  "Second READ 2 cycles after the first, burst length 8",
+  "Second READ 3 cycles after the first, burst length 8",
   "ddr2_800",
-  "ACT0@0, RD0@5, RD0@7",
+  "ACT0@0, RD0@5, RD0@8",
   "accepts",
   "illegal",
-  "p. 95: the next READ is issued BL/2 = 4 cycles after the first. The model uses tCCD alone (2); upstream's tCCD = 4 hides this.",
+  "p. 95 and Figure 49, p. 99: a BL8 READ can be interrupted only by a READ exactly 2 cycles later; otherwise the next READ waits BL/2 = 4. The model's single bound tCCD = 2 cannot reject 3.",
   "Audit 4"
  ],
  [
-  "Second WRITE 2 cycles after the first, burst length 8",
+  "Second WRITE 3 cycles after the first, burst length 8",
   "ddr2_800",
-  "ACT0@0, WR0@5, WR0@7",
+  "ACT0@0, WR0@5, WR0@8",
   "accepts",
   "illegal",
-  "p. 107: the next WRITE is issued BL/2 = 4 cycles after the first.",
+  "p. 107 and Figure 61, p. 110: a BL8 WRITE can be interrupted only by a WRITE exactly 2 cycles later; otherwise the next WRITE waits BL/2 = 4.",
   "Audit 5"
  ],
  [
